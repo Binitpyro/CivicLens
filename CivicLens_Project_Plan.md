@@ -2,19 +2,19 @@
 
 **Comprehensive Project Plan & Technical Specification** for an all-CS EPICS team
 
-*Assumes an 8-member team working one semester (~14 weeks) on a single pilot village/ward. Adjust the timeline and role count if your team differs.*
+*Assumes an 8-member team working one semester (~14 weeks) on a single pilot village/Gram Panchayat ward. Adjust the timeline and role count if your team differs.*
 
 ---
 
 ## 1. Project Overview
 
-CivicLens is a full-stack GIS platform that turns scattered village infrastructure data and resident complaints into a single, map-based system. Instead of notebooks and verbal reports, every asset (a tap, a streetlight, a school) and every issue (a broken drain, an unsafe water point) becomes a geotagged record that can be visualized, queried, and analyzed spatially — turning the project from "an app" into an actual planning tool.
+CivicLens is a full-stack GIS platform that turns scattered village infrastructure data and resident grievances into a single, map-based system. In rural India, this data usually lives in Gram Panchayat registers or word-of-mouth complaints — CivicLens turns it into geotagged records instead: every asset (a handpump, a streetlight, an Anganwadi center) and every issue (a broken drain, a non-functional water point) becomes something that can be visualized, queried, and analyzed spatially. That turns the project from "an app" into a digital planning tool for the Gram Panchayat and Gram Sabha.
 
 ---
 
 ## 2. Problem Statement
 
-Villages and semi-urban communities face recurring infrastructure and service issues — poor drainage, waste accumulation, broken streetlights, unsafe water points, and inadequate public amenities — but these problems are rarely documented in a structured, location-aware way. Without spatial context, local bodies can't easily see where problems cluster, which areas lack services entirely, or what to prioritize with limited budgets. CivicLens addresses this by giving village-level data a map, not just a list.
+Villages and semi-urban communities face recurring infrastructure and service issues — poor drainage, waste accumulation, broken streetlights, non-functional handpumps, and inadequate public amenities — but these problems are rarely documented in a structured, location-aware way that's accessible to both residents and elected representatives. Without spatial context, a Gram Panchayat can't easily see where problems cluster, which hamlets lack services entirely, or what to prioritize with a limited budget. CivicLens addresses this by giving village-level data a map, not just a list — in line with the same goals as national programs like Swachh Bharat Mission and Jal Jeevan Mission, just at hyper-local, single-ward resolution.
 
 ---
 
@@ -24,26 +24,27 @@ Villages and semi-urban communities face recurring infrastructure and service is
 
 **Objectives (semester-scoped, measurable):**
 
-1. Geotag ≥90% of visible public infrastructure in the pilot ward (roads, water points, toilets, streetlights, schools, health centers) by Week 9.
+1. Geotag ≥90% of visible public infrastructure in the pilot Gram Panchayat ward (roads, handpumps, toilets, streetlights, schools, Anganwadis, health centers) by Week 9.
 2. Ship an interactive dashboard where any team member or stakeholder can filter assets/issues by type, ward, and status in under 3 clicks.
 3. Implement a severity/priority scoring rule (not just a manual tag) so issues are ranked, not just listed.
-4. Produce at least one exportable ward-level PDF report usable by a panchayat or NGO for planning.
-5. Run two field-validation rounds with real residents/stakeholders and document their feedback.
+4. Produce at least one exportable ward-level PDF report usable by a Gram Panchayat or NGO for planning and Gram Sabha meetings.
+5. Run two field-validation rounds with real residents/stakeholders — including local ASHA or Anganwadi workers where possible — and document their feedback.
 
 ---
 
 ## 4. Scope
 
 **In scope (v1 / MVP)**
-- One village or ward
+- One village or Gram Panchayat ward
 - Geotagged infrastructure inventory (points + attributes)
 - Resident/survey-team issue reporting with photo + severity
 - Admin dashboard with counts, ward breakdown, and a hotspot view
+- Multilingual UI (English + the pilot ward's dominant local language)
 - PDF report export
 
 **Out of scope (v1)**
-- Statewide or multi-village rollout
-- Live integration with government systems
+- District-wide or multi-village rollout
+- Live integration with government portals (e.g. eGramSwaraj)
 - Satellite/raster imagery analysis
 - Predictive AI forecasting (a rule-based priority score is enough for v1)
 
@@ -53,12 +54,14 @@ Keeping scope to one ward is deliberate — it's the difference between a system
 
 ## 5. System Architecture
 
-Given the target users, this has to be **mobile-first and local-first**: rural residents and field volunteers are far more likely to own an Android phone than a laptop, and connectivity in the pilot ward may be patchy or absent entirely. The architecture reflects that — the phone is where the work happens, and the server exists to aggregate and analyze, not to gatekeep every action.
+Given the target users, this has to be **mobile-first and local-first**: rural residents and field volunteers — ASHA workers, Anganwadi staff, Panchayat volunteers, college survey teams — are far more likely to own an entry-level Android phone than a laptop, and connectivity in the pilot ward may be patchy 2G/3G or absent entirely. The architecture reflects that — the phone is where the work happens, and the server exists to aggregate and analyze, not to gatekeep every action.
 
 **Design principles:**
 - **Mobile-first, not "mobile too"** — the primary surface is a phone-sized responsive app. The "admin dashboard" is the same app at a wider viewport, not a separate product.
 - **Local-first** — every screen reads from and writes to on-device storage first, so the app is instant and fully usable offline. Sync to the server happens in the background whenever a connection exists.
 - **Low server footprint** — the server does the one thing a phone genuinely can't do well: spatial analysis across the whole ward's dataset. Everything else stays on-device.
+- **Battery- and data-conscious** — GPS is captured as a single on-demand fix, not continuous background tracking; photos are compressed client-side before upload so a survey trip doesn't burn through someone's prepaid data pack.
+- **WhatsApp-distributable** — the whole point of the PWA choice is that onboarding is a link or a QR code on the Panchayat noticeboard, not an app-store listing.
 
 ```
 ┌───────────────────────────────────────────────┐
@@ -84,6 +87,25 @@ Given the target users, this has to be **mobile-first and local-first**: rural r
 
 A phone can filter, sort, and do simple distance checks against its own cached data — that's local compute, and it's what keeps the app fast and usable at zero bars of signal. What a phone can't efficiently do is a spatial join across the whole ward's dataset or k-means clustering for hotspots — that stays server-side, but runs on a schedule (nightly, or on-demand from the admin view) instead of on every dashboard load. That scheduling, more than anything else, is what keeps server usage low.
 
+### Key Architecture Decisions
+
+| Decision | Alternatives Considered | Why This Choice | Trade-off Accepted |
+|---|---|---|---|
+| PWA over native app | React Native, Flutter | Zero-install distribution (link/QR code) — critical when residents won't download an unfamiliar app; one codebase for the whole team | Slightly less robust background GPS than a native app |
+| PostgreSQL + PostGIS over SQLite/Firebase | SQLite + SpatiaLite, Firebase Firestore with geohashing | Native spatial indexing and query functions (buffer, clustering, spatial join) are the backbone of the analytics layer | Needs a real, if thin, server — a pure on-device DB can't do this alone |
+| Local-first with background sync over always-online | Standard online-only web app | Village connectivity is patchy-to-absent; a form that needs live internet to submit won't get used in the field | Sync and conflict handling add real engineering complexity |
+| Last-write-wins conflict resolution over CRDTs | CRDT-based merge (e.g. Automerge), operational transforms | Dataset size and concurrent-edit frequency are both low (one ward, a handful of trained surveyors) — simple enough to build in a semester, and sufficient at this scale | Rare silent overwrites are possible; mitigated below by flagging true conflicts instead of auto-merging them |
+| Scheduled/cached spatial analytics over live queries | Compute hotspot/coverage-gap on every dashboard load | Keeps the free-tier server from being hammered by the two most expensive queries in the system | Dashboard analytics can be up to a day stale — acceptable, since priorities don't shift hourly |
+
+### Offline Sync & Conflict Resolution
+
+Multiple surveyors and residents can be creating or editing records offline at the same time, so "queue and send" isn't a full sync strategy on its own:
+
+- **New records** (a newly surveyed handpump, a newly reported issue) get a UUID generated on the device at creation time, not a server-assigned ID. Two volunteers surveying different hamlets can never collide, and a retried sync request becomes naturally idempotent — the server just upserts on that UUID instead of risking a duplicate row.
+- **Edits to existing records** (e.g., marking an issue "resolved") carry an `updated_at` timestamp set on-device. The server keeps whichever edit has the latest timestamp — last-write-wins, which is a reasonable simplification at this scale.
+- **Real conflicts** aren't silently resolved. If one surveyor marks an issue "resolved" while another, still offline, reopens it as "critical," the server sees the timestamp clash, keeps both versions, and surfaces it in the admin view as "needs review" instead of guessing which one is right.
+- **The outbox queue** on-device only clears an item once the server confirms the write; a dropped connection mid-sync just leaves the item queued to retry automatically next time the app is online.
+
 ---
 
 ## 6. Technical Stack
@@ -98,6 +120,7 @@ A phone can filter, sort, and do simple distance checks against its own cached d
 | Database | PostgreSQL + PostGIS | Still the right call for the heavier spatial work (clustering, coverage gaps) that needs the full dataset |
 | Auth | JWT + bcrypt | Lightweight; works offline once a token is cached locally |
 | Photo handling | Client-side resize/compress (`browser-image-compression`) before upload | Cuts upload size sharply — matters a lot on 2G/3G rural data |
+| Localization | `i18next` + `react-i18next` | Lets the same build switch between English and the ward's local language — configured per deployment, not hardcoded |
 | Charts | Recharts | Dashboard stats — lightweight, renders fine on a mid-range phone |
 | PDF export | Puppeteer or `react-pdf` (server-side) | Runs on the server on demand — not something to push onto a low-end phone |
 | Deployment | Static PWA on Netlify/Vercel (free CDN) + API on a small free-tier instance (Render/Railway) or serverless functions | Serving the app itself costs close to nothing; only the thin API layer needs a server running at all |
@@ -118,9 +141,9 @@ CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE TABLE users (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
-  phone TEXT UNIQUE,
+  phone TEXT UNIQUE, -- phone, not email, is the practical identifier in rural India
   password_hash TEXT NOT NULL,
-  role TEXT CHECK (role IN ('admin','surveyor','viewer','officer')) DEFAULT 'viewer',
+  role TEXT CHECK (role IN ('admin','surveyor','viewer','panchayat_officer')) DEFAULT 'viewer',
   ward_id INTEGER,
   created_at TIMESTAMP DEFAULT now()
 );
@@ -128,36 +151,38 @@ CREATE TABLE users (
 CREATE TABLE villages (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
+  panchayat_code TEXT, -- official Gram Panchayat code, if available (useful for future eGramSwaraj linkage)
   boundary GEOMETRY(POLYGON, 4326)
 );
 
 CREATE TABLE wards (
   id SERIAL PRIMARY KEY,
   village_id INTEGER REFERENCES villages(id),
-  name TEXT NOT NULL,
+  name TEXT NOT NULL, -- ward number, or a specific hamlet/Tola/Para name
   boundary GEOMETRY(POLYGON, 4326)
 );
 
 CREATE TABLE assets (
-  id SERIAL PRIMARY KEY,
+  id UUID PRIMARY KEY, -- generated client-side at creation time; see Offline Sync in Section 5
   ward_id INTEGER REFERENCES wards(id),
   asset_type TEXT NOT NULL CHECK (asset_type IN (
-    'road','water_point','toilet','school','health_center',
-    'streetlight','waste_point','drainage','anganwadi','bus_stop'
+    'road','handpump','overhead_tank','public_toilet','school',
+    'anganwadi','phc','streetlight','drainage','ration_shop'
   )),
   name TEXT,
-  status TEXT DEFAULT 'active',
+  status TEXT DEFAULT 'active', -- active, non_functional, under_construction
   location GEOMETRY(POINT, 4326) NOT NULL,
-  attributes JSONB DEFAULT '{}',
-  created_at TIMESTAMP DEFAULT now()
+  attributes JSONB DEFAULT '{}', -- e.g. {"handpump_type": "India Mark II", "depth_ft": 150}
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
 );
 CREATE INDEX idx_assets_location ON assets USING GIST (location);
 
 CREATE TABLE issues (
-  id SERIAL PRIMARY KEY,
-  asset_id INTEGER REFERENCES assets(id),
+  id UUID PRIMARY KEY, -- generated client-side; see Offline Sync in Section 5
+  asset_id UUID REFERENCES assets(id),
   ward_id INTEGER REFERENCES wards(id),
-  category TEXT NOT NULL,
+  category TEXT NOT NULL, -- water_supply, sanitation, street_lighting, roads, electricity
   severity TEXT CHECK (severity IN ('low','medium','high','critical')) DEFAULT 'medium',
   description TEXT,
   photo_url TEXT,
@@ -166,7 +191,8 @@ CREATE TABLE issues (
   reported_by INTEGER REFERENCES users(id),
   assigned_officer TEXT,
   date_reported TIMESTAMP DEFAULT now(),
-  date_resolved TIMESTAMP
+  date_resolved TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT now()
 );
 CREATE INDEX idx_issues_location ON issues USING GIST (location);
 
@@ -186,22 +212,22 @@ The `GIST` indexes on `location` are what make spatial queries (nearest-neighbor
 
 ## 8. Module Specifications
 
-**A. Map Layer Module** — Base map with toggleable layers (roads, water points, toilets, schools, etc.), popups on click, search-by-ward. Tiles and data cache locally as the ward is explored, so a volunteer's already-viewed area stays usable with no signal.
-`GET /api/assets?type=toilet&ward_id=3` → GeoJSON FeatureCollection, cached to IndexedDB on fetch.
+**A. Map Layer Module** — Base map with toggleable layers (roads, handpumps, public toilets, Anganwadis, PHCs, etc.), popups on click, search-by-ward. Tiles and data cache locally as the ward is explored, so a volunteer's already-viewed area stays usable with no signal.
+`GET /api/assets?type=handpump&ward_id=3` → GeoJSON FeatureCollection, cached to IndexedDB on fetch.
 
-**B. Issue Reporting Module** — Tap-to-pin location, category dropdown, severity selector, photo upload.
+**B. Issue Reporting Module** — Tap-to-pin location, category dropdown (Water, Sanitation, Electricity, Roads), severity selector, photo upload — UI available in English and the local language.
 `POST /api/issues` with `{category, severity, location, photo}`.
 
-**C. Admin Dashboard** — Total/ward-wise/category-wise counts, resolved vs. open, monthly trend chart.
+**C. Admin Dashboard** — Total/ward-wise/category-wise counts, resolved vs. open, monthly trend chart. Typically used by the Panchayat Secretary (Gram Sachiv) or an NGO lead.
 `GET /api/analytics/summary` — powered by a spatial join between `issues` and `wards`.
 
-**D. Survey Data Collection Module** — GPS auto-capture, local queue, batch sync when back online. This isn't a special offline mode bolted onto one screen — it's the same local-first pattern from Section 5, applied to data entry.
+**D. Survey Data Collection Module** — GPS auto-capture, local queue, batch sync when back online. Used by college volunteers, ASHA workers, or Panchayat staff during a survey trip; this isn't a special offline mode bolted onto one screen — it's the same local-first pattern from Section 5, applied to data entry.
 `POST /api/assets/bulk` for syncing a batch after a survey trip.
 
-**E. Analytics / Hotspot Module** — Heatmap of complaint density, clustering, coverage-gap detection (e.g., schools with no nearby toilet).
+**E. Analytics / Hotspot Module** — Heatmap of complaint density, clustering, coverage-gap detection (e.g., schools with no handpump within 500m).
 `GET /api/analytics/hotspots`, `GET /api/analytics/coverage-gaps`.
 
-**F. Report Generation Module** — Ward-level PDF with a map snapshot, top-priority issue list, and asset summary table.
+**F. Report Generation Module** — Ward-level PDF with a map snapshot, top-priority issue list, and asset summary table — sized for presenting at a Gram Sabha meeting.
 `GET /api/reports/ward/:id`.
 
 ---
@@ -212,23 +238,23 @@ This is where the conceptual GIS toolkit becomes actual features:
 
 | GIS Operation | How it's used | Example |
 |---|---|---|
-| **Buffer analysis** | Coverage-gap detection — "schools with no toilet within 500m" | `ST_DWithin(school.location::geography, toilet.location::geography, 500)` |
+| **Buffer analysis** | Coverage-gap detection — "schools with no handpump within 500m" | `ST_DWithin(school.location::geography, handpump.location::geography, 500)` |
 | **Spatial join** | Attaching each issue to its ward for dashboard counts | `ST_Within(issue.location, ward.boundary)` |
-| **Clustering/hotspot** | Complaint density heatmap | `ST_ClusterKMeans(location, 5) OVER ()` or grid-count aggregation |
-| **Proximity/nearest-neighbor** | "Nearest health center" lookup | `ORDER BY location <-> ST_MakePoint(:lon,:lat)` (KNN operator) |
+| **Clustering/hotspot** | Complaint density heatmap for Panchayat review | `ST_ClusterKMeans(location, 5) OVER ()` or grid-count aggregation |
+| **Proximity/nearest-neighbor** | "Nearest PHC (Primary Health Centre)" lookup | `ORDER BY location <-> ST_MakePoint(:lon,:lat)` (KNN operator) |
 | **Overlay analysis** | Combining two asset layers to find under-served zones | `ST_Intersects` / `ST_Contains` between layers |
 | **Geocoding** | Address fallback when GPS is unavailable during survey | External call to Nominatim/OSM geocoding API |
 
 Two ready-to-use example queries:
 
 ```sql
--- Coverage gap: schools with no toilet within 500m
+-- Coverage gap: schools with no handpump within 500m
 SELECT s.id, s.name
 FROM assets s
 WHERE s.asset_type = 'school'
 AND NOT EXISTS (
   SELECT 1 FROM assets t
-  WHERE t.asset_type = 'toilet'
+  WHERE t.asset_type = 'handpump'
   AND ST_DWithin(s.location::geography, t.location::geography, 500)
 );
 
@@ -246,12 +272,12 @@ ORDER BY issue_count DESC;
 
 ## 10. Development Workflow
 
-1. **Select the pilot village/ward** — confirm access and a local contact (panchayat member, NGO, or school).
+1. **Select the pilot village/Gram Panchayat ward** — confirm access and a local contact (Sarpanch, Panchayat Secretary, NGO, or an ASHA/Anganwadi worker).
 2. **Survey the area** — collect GPS points, photos, and known issues across all major asset categories.
 3. **Load the data** — bulk-insert into PostGIS via the survey app or a CSV import script.
 4. **Build the map layers** — render each asset type as a toggleable Leaflet layer.
 5. **Add reporting + status logic** — let residents/volunteers submit and track issues.
-6. **Run analytics** — hotspot and coverage-gap queries surface what to prioritize.
+6. **Run analytics** — hotspot and coverage-gap queries surface what to prioritize before the next Gram Sabha.
 7. **Demo and validate** — present the working prototype to stakeholders and record feedback.
 
 ---
@@ -267,7 +293,7 @@ ORDER BY issue_count DESC;
 | 5 | PWA/Offline-Sync Lead | Service worker, IndexedDB sync engine, offline queue & conflict handling | Offline-sync layer |
 | 6 | Analytics Lead | Hotspot/coverage-gap logic, charts | Analytics module |
 | 7 | QA/DevOps Lead | Testing, CI/CD, deployment | Test suite + live deploy |
-| 8 | Docs/Presentation Lead | Documentation, report writing, demo prep | Final report + slides |
+| 8 | Docs/Community Lead | Documentation, report writing, Panchayat/NGO coordination, demo prep | Final report + slides |
 
 ---
 
@@ -281,13 +307,13 @@ ORDER BY issue_count DESC;
 | 4 | Setup | Repo, PostGIS DB (e.g. Supabase), PWA scaffold + service worker, CI |
 | 5 | Core Build 1 | Auth, asset CRUD API, base map with layers |
 | 6 | Core Build 2 | Issue reporting form + API, photo upload |
-| 7 | Field Survey Round 1 | Collect real geotagged asset data |
+| 7 | Field Survey Round 1 | Collect real geotagged asset data, coordinated with local volunteers |
 | 8 | Core Build 3 | Admin dashboard, ward-wise counts |
 | 9 | Core Build 4 | Hotspot/coverage-gap module |
 | 10 | Field Survey Round 2 | Validate data, collect resident issue reports |
 | 11 | Reporting | PDF export, analytics polish |
 | 12 | Integration & Testing | End-to-end testing, bug fixes |
-| 13 | Stakeholder Demo | Present to panchayat/faculty, gather feedback |
+| 13 | Stakeholder Demo | Present to Panchayat/faculty, gather feedback |
 | 14 | Finalize | Polish, documentation, viva prep |
 
 ---
@@ -298,7 +324,7 @@ ORDER BY issue_count DESC;
 - Same app doubles as the field-survey tool and the admin dashboard — no separate builds
 - Geotagged asset dataset for the pilot ward
 - Interactive map with toggleable layers
-- Issue reporting + status-tracking workflow
+- Issue reporting + status-tracking workflow (multilingual)
 - Hotspot and coverage-gap analytics
 - Ward-level PDF report export
 - Field-validation writeup with stakeholder feedback
@@ -320,19 +346,19 @@ ORDER BY issue_count DESC;
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| GPS inaccuracy in dense/covered areas | Mislabeled assets | Manual correction UI; cross-check against basemap |
+| GPS inaccuracy in dense village lanes | Mislabeled assets | Manual correction UI; cross-check against satellite basemap |
 | Limited/no internet in the village | Can't submit forms live | Local-first PWA — every screen works offline by default, background sync on reconnect |
-| Low-end/older Android phones | Slow load, limited storage | Keep app bundle small, lazy-load admin-only screens, cap local tile cache with LRU eviction |
-| Low resident participation | Sparse issue data | Involve local volunteers; multilingual UI |
+| Low-end/older Android phones | Slow load, limited storage, battery drain | Keep app bundle small, lazy-load admin-only screens, cap local tile cache, single-shot (not continuous) GPS polling |
+| Language barrier | Low resident participation | Local-language UI via i18next; icons alongside text for low-literacy users |
+| Resident apathy or privacy concerns | Sparse issue data | Optional anonymous reporting; PII visible to admins only; distribute via trusted local ASHA/NGO workers |
 | Team schedule conflicts | Missed milestones | Weekly standup + shared task board |
 | Scope creep | Missed deadline | Freeze MVP scope after Week 4; log extras as stretch goals |
-| Complainant privacy | Trust/adoption issues | Optional anonymous reporting; PII visible to admins only |
 
 ---
 
 ## 16. Social Impact
 
-CivicLens turns undocumented, word-of-mouth complaints into structured, mappable data — which is what actually lets a panchayat or NGO plan: where drainage work is most urgent, which hamlet lacks a toilet within reach, where waste is piling up. It doesn't replace local governance, it gives it something concrete to point at.
+CivicLens turns undocumented, word-of-mouth complaints into structured, mappable data — which is what actually lets a Gram Panchayat plan: where drainage work is most urgent before the monsoon, which hamlet lacks a working handpump within reach, where waste is piling up. It doesn't replace local governance, it gives the Gram Sabha something concrete and data-driven to point at.
 
 ---
 
@@ -340,6 +366,6 @@ CivicLens turns undocumented, word-of-mouth complaints into structured, mappable
 
 - Rule-based → ML priority scoring (severity + frequency + affected population)
 - SMS/IVR reporting for residents without smartphones
-- Local-language UI toggle
 - Public transparency view — residents track their own report's status
-- Export hooks for e-governance portal integration
+- Export hooks for e-Governance portal integration (e.g. eGramSwaraj)
+- Real-time tracking of Panchayat worker dispatch to resolved issues
