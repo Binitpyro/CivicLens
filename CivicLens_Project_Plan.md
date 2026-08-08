@@ -62,6 +62,7 @@ Given the target users, this has to be **mobile-first and local-first**: rural r
 - **Low server footprint** — the server does the one thing a phone genuinely can't do well: spatial analysis across the whole ward's dataset. Everything else stays on-device.
 - **Battery- and data-conscious** — GPS is captured as a single on-demand fix, not continuous background tracking; photos are compressed client-side before upload so a survey trip doesn't burn through someone's prepaid data pack.
 - **WhatsApp-distributable** — the whole point of the PWA choice is that onboarding is a link or a QR code on the Panchayat noticeboard, not an app-store listing.
+- **Zero/near-zero running cost** — every layer sits on a genuinely permanent free tier, not a time-limited trial, so the pilot doesn't need a budget line or a credit card.
 
 ```
 ┌───────────────────────────────────────────────┐
@@ -117,17 +118,36 @@ Multiple surveyors and residents can be creating or editing records offline at t
 | Map rendering | Leaflet.js + `leaflet.offline` | Tiles cache to IndexedDB as they're viewed, so a previously-loaded area of the map works at zero signal |
 | Client-side spatial ops | Turf.js | Distance checks/filtering on cached data run on-device — no server round-trip for the simple stuff |
 | Backend API | Node.js + Express (or Django + GeoDjango if the team prefers Python) | Kept deliberately thin: sync, auth, and the handful of queries a phone can't do |
-| Database | PostgreSQL + PostGIS | Still the right call for the heavier spatial work (clustering, coverage gaps) that needs the full dataset |
+| Database | PostgreSQL + PostGIS via Supabase's free project | Free indefinitely (500MB DB + 1GB file storage) — just needs a scheduled keep-alive ping so it doesn't auto-pause after 7 days idle |
 | Auth | JWT + bcrypt | Lightweight; works offline once a token is cached locally |
-| Photo handling | Client-side resize/compress (`browser-image-compression`) before upload | Cuts upload size sharply — matters a lot on 2G/3G rural data |
+| Photo handling | Client-side resize/compress (`browser-image-compression`) before upload | Cuts upload size sharply — matters a lot on 2G/3G rural data, and keeps you under the free storage cap |
 | Localization | `i18next` + `react-i18next` | Lets the same build switch between English and the ward's local language — configured per deployment, not hardcoded |
 | Charts | Recharts | Dashboard stats — lightweight, renders fine on a mid-range phone |
-| PDF export | Puppeteer or `react-pdf` (server-side) | Runs on the server on demand — not something to push onto a low-end phone |
-| Deployment | Static PWA on Netlify/Vercel (free CDN) + API on a small free-tier instance (Render/Railway) or serverless functions | Serving the app itself costs close to nothing; only the thin API layer needs a server running at all |
+| PDF export | `@react-pdf/renderer` (server-side) | Generates the PDF without spinning up a headless browser — Puppeteer's Chromium footprint is a real risk on a free tier's ~512MB RAM limit |
+| Deployment | Static PWA on Netlify/Vercel (free CDN) + API on Render's free web service (750 hrs/month — enough for 24/7) | $0 across the board; the trade-off is a cold start after ~15 min idle unless kept warm (see Estimated Running Costs below) |
 
 **Why a PWA instead of a native app:** a native Android app means an install step — Play Store or a sideloaded APK — which is real friction for a resident who just wants to report one pothole. A PWA is just a link, shareable over WhatsApp or printed as a QR code on a village noticeboard; it adds itself to the home screen after the first visit and behaves like an app from then on, offline included. The one place native still has a real edge is rock-solid background GPS — if the survey team specifically needs that, React Native for just the volunteer-survey flow (distributed as a direct APK to the trained survey team, not to residents) is a reasonable swap.
 
 **Fast-start tip:** for the database, skip DB ops entirely with **Supabase** — hosted PostgreSQL with PostGIS installable as an extension, plus built-in auth and file storage. For a semester project this alone can save a team a couple of weeks of infrastructure setup. Be cautious of the "SQLite for simplicity" route sometimes suggested for MVPs — plain SQLite has no native spatial type or spatial index, so you'd lose most of what makes PostGIS worth using in the first place.
+
+### Estimated Running Costs (Pilot Scale)
+
+| Component | Provider | Free tier covers | Cost |
+|---|---|---|---|
+| Frontend hosting | Netlify or Vercel | ~100GB bandwidth/month | $0 |
+| Backend API | Render free web service | 750 hrs/month (a full month, 24/7) | $0 — sleeps after 15 min idle, ~30–60s cold start on wake |
+| Database + file storage | Supabase free project | 500MB database, 1GB file storage, 5GB egress | $0 — pauses after 7 days with no requests, needs manual unpause unless kept alive |
+| Map tiles | OpenStreetMap | Standard usage policy | $0 |
+| CI | GitHub Actions | Free on public repos | $0 |
+| Domain | Platform subdomains (`*.vercel.app`, `*.onrender.com`) | — | $0 (a custom domain is optional, roughly ₹800–1,200/year if wanted later) |
+
+**Total: $0/month**, with two habits to keep it that way rather than something you configure once and forget:
+1. **A free keep-alive ping** — a GitHub Actions cron job or an UptimeRobot free monitor hitting both the Render API and the Supabase project every couple of days. This prevents Supabase's 7-day pause and Render's cold starts from ever coinciding with a demo.
+2. **A manual backup habit** — the Supabase free tier has no automatic backups. A `pg_dump` after each field survey day (or on a weekly cron) costs nothing and protects the one thing that's actually expensive to redo: real field data.
+
+If the team ever wants to sidestep Supabase's pause behavior specifically, Neon's free tier is a genuine alternative — it scales compute to zero and wakes automatically in under a second rather than requiring a manual dashboard click, though it doesn't bundle file storage the way Supabase does, so photos would need a separate free tier (Cloudflare R2's free 10GB is a reasonable pairing).
+
+One thing to explicitly keep out of MVP scope for cost reasons: the SMS/IVR stretch goal (Section 17) — SMS gateways like Twilio charge per message, so that one only makes sense post-pilot if a sponsor or the Panchayat itself is funding it.
 
 ---
 
