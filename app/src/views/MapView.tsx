@@ -17,7 +17,9 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [selectedItem, setSelectedItem] = useState<{ title: string; type: string; details: string; status: string } | null>(null);
 
-  // Load local items from Dexie IndexedDB
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4000/api';
+
+  // Load local items from Dexie IndexedDB & fetch remote updates when online
   useEffect(() => {
     async function loadData() {
       try {
@@ -28,7 +30,64 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
       } catch (err) {
         console.error('Error loading map data from Dexie:', err);
       }
+
+      if (navigator.onLine) {
+        try {
+          const [assetRes, issueRes] = await Promise.all([
+            fetch(`${API_BASE}/assets`),
+            fetch(`${API_BASE}/issues`),
+          ]);
+
+          if (assetRes.ok) {
+            const assetData = await assetRes.json();
+            if (assetData.features) {
+              const remoteAssets: LocalAsset[] = assetData.features.map((f: any) => ({
+                id: f.properties.id,
+                ward_id: f.properties.ward_id,
+                asset_type: f.properties.asset_type,
+                name: f.properties.name,
+                lbd_asset_id: f.properties.lbd_asset_id,
+                status: f.properties.status,
+                latitude: f.geometry.coordinates[1],
+                longitude: f.geometry.coordinates[0],
+                attributes: f.properties.attributes || {},
+                version_id: f.properties.version_id || 1,
+                sync_state: 'submitted' as const,
+              }));
+              await db.assets.bulkPut(remoteAssets);
+              setAssets(await db.assets.toArray());
+            }
+          }
+
+          if (issueRes.ok) {
+            const issueData = await issueRes.json();
+            if (issueData.features) {
+              const remoteIssues: LocalIssue[] = issueData.features.map((f: any) => ({
+                id: f.properties.id,
+                asset_id: f.properties.asset_id,
+                ward_id: f.properties.ward_id,
+                category: f.properties.category,
+                severity: f.properties.severity,
+                description: f.properties.description,
+                photo_url: f.properties.photo_url,
+                latitude: f.geometry.coordinates[1],
+                longitude: f.geometry.coordinates[0],
+                status: f.properties.status,
+                version_id: f.properties.version_id || 1,
+                client_seq_num: f.properties.client_seq_num || 1,
+                date_reported: f.properties.date_reported || new Date().toISOString(),
+                sync_state: 'submitted' as const,
+              }));
+              await db.issues.bulkPut(remoteIssues);
+              setIssues(await db.issues.toArray());
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to fetch remote GeoJSON markers:', err);
+        }
+      }
     }
+
     loadData();
 
     // Default mock data if empty

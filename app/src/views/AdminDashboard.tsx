@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { db } from '../db';
+
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4000/api';
 
 interface SummaryData {
   assets_count: number;
@@ -15,21 +18,77 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onOpenPrintView }) => {
-  const [data] = useState<SummaryData>({
-    assets_count: 18,
-    issues_count: 7,
-    open_issues: 4,
-    resolved_issues: 3,
-    categories: [
-      { name: 'Water Supply', count: 3 },
-      { name: 'Street Lighting', count: 2 },
-      { name: 'Drainage', count: 2 },
-    ],
+  const [data, setData] = useState<SummaryData>({
+    assets_count: 0,
+    issues_count: 0,
+    open_issues: 0,
+    resolved_issues: 0,
+    categories: [],
     coverage_gaps: [
       { name: 'Govt Primary School Ward 3', type: 'School', gap: 'No active handpump within 500m' },
       { name: 'Anganwadi Center Kalyanpur', type: 'Anganwadi', gap: 'No public toilet within 300m' },
     ],
   });
+
+  useEffect(() => {
+    async function loadAnalytics() {
+      if (navigator.onLine) {
+        try {
+          const res = await fetch(`${API_BASE}/analytics/summary?ward_id=1`);
+          if (res.ok) {
+            const summary = await res.json();
+            const totalAssets = summary.assets?.reduce((acc: number, curr: any) => acc + parseInt(curr.count, 10), 0) || 0;
+            const openCount = summary.issues_by_status?.find((s: any) => s.status === 'open')?.count || 0;
+            const resolvedCount = summary.issues_by_status?.find((s: any) => s.status === 'resolved')?.count || 0;
+            const totalIssues = summary.issues_by_category?.reduce((acc: number, curr: any) => acc + parseInt(curr.count, 10), 0) || 0;
+            
+            const cats = summary.issues_by_category?.map((c: any) => ({
+              name: c.category,
+              count: parseInt(c.count, 10),
+            })) || [];
+
+            setData(prev => ({
+              ...prev,
+              assets_count: totalAssets,
+              issues_count: totalIssues,
+              open_issues: parseInt(openCount, 10),
+              resolved_issues: parseInt(resolvedCount, 10),
+              categories: cats.length > 0 ? cats : prev.categories,
+            }));
+            return;
+          }
+        } catch (err) {
+          console.warn('Failed to fetch online analytics summary, falling back to local database:', err);
+        }
+      }
+
+      // Offline fallback from Dexie
+      try {
+        const localAssets = await db.assets.count();
+        const localIssues = await db.issues.toArray();
+        const open = localIssues.filter(i => i.status === 'open').length;
+        const resolved = localIssues.filter(i => i.status === 'resolved').length;
+        
+        const catMap: Record<string, number> = {};
+        localIssues.forEach(i => {
+          catMap[i.category] = (catMap[i.category] || 0) + 1;
+        });
+
+        setData(prev => ({
+          ...prev,
+          assets_count: localAssets,
+          issues_count: localIssues.length,
+          open_issues: open,
+          resolved_issues: resolved,
+          categories: Object.entries(catMap).map(([name, count]) => ({ name, count })),
+        }));
+      } catch (err) {
+        console.error('Error reading offline analytics from Dexie:', err);
+      }
+    }
+
+    loadAnalytics();
+  }, []);
 
   const COLORS = ['#0284c7', '#eab308', '#ea580c', '#16a34a', '#dc2626'];
 

@@ -17,7 +17,7 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    return next();
+    return res.status(401).json({ error: 'Authentication token required' });
   }
 
   jwt.verify(token, JWT_SECRET, (err: any, user: any) => {

@@ -11,7 +11,7 @@ function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
     if (!token) {
-        return next();
+        return res.status(401).json({ error: 'Authentication token required' });
     }
     jsonwebtoken_1.default.verify(token, JWT_SECRET, (err, user) => {
         if (err) {

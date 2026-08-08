@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { db } from '../db';
 
-const API_BASE = 'http://localhost:4000/api';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4000/api';
 
 export function useOfflineSync() {
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
@@ -67,11 +67,17 @@ export function useOfflineSync() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 45000);
 
+      const token = localStorage.getItem('civiclens_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${API_BASE}/sync`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({ batch }),
         signal: controller.signal,
       });

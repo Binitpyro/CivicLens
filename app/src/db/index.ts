@@ -72,10 +72,10 @@ const ENCRYPTION_KEY_STRING = 'civiclens-local-pii-secret-2026';
 
 async function getCryptoKey(): Promise<CryptoKey> {
   const enc = new TextEncoder();
-  const keyData = enc.encode(ENCRYPTION_KEY_STRING.padEnd(32, '0').slice(0, 32));
+  const keyMaterial = await crypto.subtle.digest('SHA-256', enc.encode(ENCRYPTION_KEY_STRING));
   return crypto.subtle.importKey(
     'raw',
-    keyData,
+    keyMaterial,
     { name: 'AES-GCM' },
     false,
     ['encrypt', 'decrypt']
