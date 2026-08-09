@@ -14,6 +14,7 @@ export async function getIssuesGeoJSON(req: Request, res: Response) {
         severity, 
         description,
         photo_url,
+        encrypted_phone,
         status, 
         reported_by,
         assigned_officer,
@@ -54,6 +55,7 @@ export async function getIssuesGeoJSON(req: Request, res: Response) {
         severity: row.severity,
         description: row.description,
         photo_url: row.photo_url,
+        encrypted_phone: row.encrypted_phone,
         status: row.status,
         reported_by: row.reported_by,
         assigned_officer: row.assigned_officer,
@@ -77,7 +79,7 @@ export async function getIssuesGeoJSON(req: Request, res: Response) {
 
 export async function createIssue(req: AuthRequest, res: Response) {
   try {
-    const { id, asset_id, ward_id, category, severity, description, photo_url, latitude, longitude, client_seq_num } = req.body;
+    const { id, asset_id, ward_id, category, severity, description, photo_url, encrypted_phone, latitude, longitude, client_seq_num } = req.body;
     if (!id || !category || latitude === undefined || longitude === undefined) {
       return res.status(400).json({ error: 'ID, category, latitude, and longitude are required' });
     }
@@ -87,19 +89,20 @@ export async function createIssue(req: AuthRequest, res: Response) {
 
     const result = await pool.query(
       `INSERT INTO issues (
-        id, asset_id, ward_id, category, severity, description, photo_url, location, reported_by, client_seq_num, server_received_at
+        id, asset_id, ward_id, category, severity, description, photo_url, encrypted_phone, location, reported_by, client_seq_num, server_received_at
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, ST_SetSRID(ST_MakePoint($8, $9), 4326), $10, $11, now())
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, ST_SetSRID(ST_MakePoint($9, $10), 4326), $11, $12, now())
        ON CONFLICT (id) DO UPDATE SET
          category = EXCLUDED.category,
          severity = EXCLUDED.severity,
          description = EXCLUDED.description,
          photo_url = EXCLUDED.photo_url,
+         encrypted_phone = EXCLUDED.encrypted_phone,
          status = EXCLUDED.status,
          version_id = issues.version_id + 1,
          updated_at = now()
        RETURNING id, category, severity, status, version_id, server_received_at`,
-      [id, asset_id || null, ward_id || 1, category, severity || 'medium', description || '', photo_url || null, longitude, latitude, userId, seqNum]
+      [id, asset_id || null, ward_id || 1, category, severity || 'medium', description || '', photo_url || null, encrypted_phone || null, longitude, latitude, userId, seqNum]
     );
 
     return res.status(201).json(result.rows[0]);

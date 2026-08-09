@@ -7,6 +7,7 @@ import { useOfflineSync } from '../hooks/useOfflineSync';
 
 interface ReportIssueFormProps {
   onSuccess?: () => void;
+  initialCoords?: { lat: number; lng: number } | null;
 }
 
 const CATEGORIES = [
@@ -18,10 +19,13 @@ const CATEGORIES = [
   { id: 'School / Anganwadi', icon: '🏫', labelKey: 'categories.education', color: '#9333ea' },
 ];
 
-export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess }) => {
+export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, initialCoords }) => {
   const { t } = useTranslation();
-  const { latitude, longitude, accuracy, loading: geoLoading, getSingleFix } = useGeolocation();
+  const { latitude: geoLat, longitude: geoLng, accuracy, loading: geoLoading, getSingleFix } = useGeolocation();
   const { triggerSync } = useOfflineSync();
+
+  const latitude = initialCoords?.lat ?? geoLat;
+  const longitude = initialCoords?.lng ?? geoLng;
 
   const [category, setCategory] = useState<string>('Water Supply');
   const [severity, setSeverity] = useState<string>('medium');
@@ -91,6 +95,7 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess }) =
           severity,
           description,
           photo_url: photoDataUrl || null,
+          encrypted_phone: encryptedPhone || null,
           latitude: latitude || 28.6139,
           longitude: longitude || 77.2090,
           status: 'open',

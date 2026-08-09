@@ -1,13 +1,62 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { db, type LocalAsset, type LocalIssue } from '../db';
 
 interface ReportPrintViewProps {
   onBack: () => void;
 }
 
 export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
+  const [assets, setAssets] = useState<LocalAsset[]>([]);
+  const [issues, setIssues] = useState<LocalIssue[]>([]);
+  const [coverageGaps, setCoverageGaps] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4000/api';
+
+  useEffect(() => {
+    async function loadReportData() {
+      try {
+        const localAssets = await db.assets.toArray();
+        const localIssues = await db.issues.toArray();
+        setAssets(localAssets);
+        setIssues(localIssues);
+
+        if (navigator.onLine) {
+          try {
+            const gapRes = await fetch(`${API_BASE}/analytics/coverage-gaps`);
+            if (gapRes.ok) {
+              const gapData = await gapRes.json();
+              if (gapData.features) {
+                setCoverageGaps(gapData.features);
+              }
+            }
+          } catch (e) {
+            console.warn('Could not fetch online coverage gaps:', e);
+          }
+        }
+      } catch (err) {
+        console.error('Error loading report print view data:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadReportData();
+  }, []);
+
   const handlePrint = () => {
     window.print();
   };
+
+  // Group assets by type for dynamic summary table
+  const assetTypes = Array.from(new Set(assets.map((a) => a.asset_type)));
+  const assetSummary = assetTypes.map((type) => {
+    const matching = assets.filter((a) => a.asset_type === type);
+    const active = matching.filter((a) => a.status === 'active').length;
+    const nonFunctional = matching.filter((a) => a.status !== 'active').length;
+    return { type, total: matching.length, active, nonFunctional };
+  });
+
+  const activeGrievances = issues.filter((i) => i.status !== 'resolved');
 
   return (
     <div className="print-view-wrapper">
@@ -15,7 +64,7 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
         <button className="btn-back" onClick={onBack}>
           ← Back to Dashboard
         </button>
-        <button className="btn-print-now" onClick={handlePrint}>
+        <button className="btn-print-now" onClick={handlePrint} disabled={loading}>
           🖨️ Print / Save as PDF
         </button>
       </div>
@@ -23,95 +72,87 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
       <div className="printable-document">
         <div className="doc-header">
           <h1>GRAM PANCHAYAT INFRASTRUCTURE & GRIEVANCE REPORT</h1>
-          <h2>Shivpur Gram Panchayat • Ward 3 (Kalyanpur)</h2>
-          <p className="doc-meta">Generated Date: {new Date().toLocaleDateString()} | System: CivicLens GIS Platform</p>
+          <h2>Gram Panchayat Monitoring Report — Ward 1</h2>
+          <p className="doc-meta">
+            Generated Date: {new Date().toLocaleDateString()} | System: CivicLens GIS Platform
+          </p>
         </div>
 
         <hr className="doc-divider" />
 
         <section className="doc-section">
           <h3>1. Executive Infrastructure Inventory</h3>
-          <table className="doc-table">
-            <thead>
-              <tr>
-                <th>Asset Type</th>
-                <th>Total Geotagged</th>
-                <th>Working Condition</th>
-                <th>Non-Functional</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Handpumps (Water)</td>
-                <td>6</td>
-                <td>4</td>
-                <td>2</td>
-              </tr>
-              <tr>
-                <td>Streetlights (Solar LED)</td>
-                <td>8</td>
-                <td>6</td>
-                <td>2</td>
-              </tr>
-              <tr>
-                <td>Public Toilets</td>
-                <td>2</td>
-                <td>2</td>
-                <td>0</td>
-              </tr>
-              <tr>
-                <td>Schools / Anganwadis</td>
-                <td>3</td>
-                <td>3</td>
-                <td>0</td>
-              </tr>
-            </tbody>
-          </table>
+          {assetSummary.length === 0 ? (
+            <p className="doc-text">No geotagged assets recorded yet.</p>
+          ) : (
+            <table className="doc-table">
+              <thead>
+                <tr>
+                  <th>Asset Type</th>
+                  <th>Total Geotagged</th>
+                  <th>Working Condition</th>
+                  <th>Non-Functional / Damaged</th>
+                </tr>
+              </thead>
+              <tbody>
+                {assetSummary.map((item) => (
+                  <tr key={item.type}>
+                    <td>{item.type.replace('_', ' ').toUpperCase()}</td>
+                    <td>{item.total}</td>
+                    <td>{item.active}</td>
+                    <td>{item.nonFunctional}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </section>
 
         <section className="doc-section">
           <h3>2. High-Priority Grievances for Gram Sabha Resolution</h3>
-          <table className="doc-table">
-            <thead>
-              <tr>
-                <th>Category</th>
-                <th>Severity</th>
-                <th>Location / Hamlet</th>
-                <th>Description</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Water Supply</td>
-                <td>HIGH</td>
-                <td>School Badi Handpump</td>
-                <td>Handle broken and water smells foul</td>
-                <td>OPEN</td>
-              </tr>
-              <tr>
-                <td>Drainage</td>
-                <td>CRITICAL</td>
-                <td>East Hamlet Drain</td>
-                <td>Drain blocked by waste causing overflow</td>
-                <td>OPEN</td>
-              </tr>
-              <tr>
-                <td>Street Lighting</td>
-                <td>MEDIUM</td>
-                <td>Temple Junction</td>
-                <td>Solar battery dead, street dark at night</td>
-                <td>IN PROGRESS</td>
-              </tr>
-            </tbody>
-          </table>
+          {activeGrievances.length === 0 ? (
+            <p className="doc-text">No open grievances pending resolution.</p>
+          ) : (
+            <table className="doc-table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Severity</th>
+                  <th>Coordinates (Lat, Lng)</th>
+                  <th>Description</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activeGrievances.map((iss) => (
+                  <tr key={iss.id}>
+                    <td>{iss.category}</td>
+                    <td>{iss.severity.toUpperCase()}</td>
+                    <td>{iss.latitude.toFixed(4)}, {iss.longitude.toFixed(4)}</td>
+                    <td>{iss.description || 'No description'}</td>
+                    <td>{iss.status.toUpperCase()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </section>
 
         <section className="doc-section">
           <h3>3. Coverage Gap Analysis</h3>
-          <p className="doc-text">
-            <strong>Target Action Required:</strong> Govt Primary School Ward 3 lacks a functional drinking water handpump within 500 meters. Installation recommended before upcoming monsoon.
-          </p>
+          {coverageGaps.length > 0 ? (
+            <div className="doc-gap-list">
+              {coverageGaps.map((gap, idx) => (
+                <p key={gap.properties.id || idx} className="doc-text">
+                  <strong>Target Action Required:</strong> {gap.properties.name || gap.properties.type} — {gap.properties.gap_type}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="doc-text">
+              <strong>Target Action Required:</strong> Schools and health facilities in Ward 1 currently have functional drinking water access within 500m buffer zone.
+            </p>
+          )}
         </section>
 
         <div className="doc-footer">

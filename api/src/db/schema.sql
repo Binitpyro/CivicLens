@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS issues (
   severity TEXT CHECK (severity IN ('low','medium','high','critical')) DEFAULT 'medium',
   description TEXT,
   photo_url TEXT,
+  encrypted_phone TEXT,
   location GEOMETRY(POINT, 4326) NOT NULL,
   status TEXT DEFAULT 'open' CHECK (status IN ('open','in_progress','resolved')),
   reported_by INTEGER REFERENCES users(id) ON DELETE SET NULL,

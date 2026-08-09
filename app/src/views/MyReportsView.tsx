@@ -1,16 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { db, type LocalIssue } from '../db';
+import { db, decryptPII, type LocalIssue } from '../db';
 import { useTranslation } from 'react-i18next';
+
+interface IssueWithDecryptedPhone extends LocalIssue {
+  decryptedPhone?: string;
+}
 
 export const MyReportsView: React.FC = () => {
   const { t } = useTranslation();
-  const [myIssues, setMyIssues] = useState<LocalIssue[]>([]);
+  const [myIssues, setMyIssues] = useState<IssueWithDecryptedPhone[]>([]);
 
   useEffect(() => {
     async function fetchMyIssues() {
       try {
         const issues = await db.issues.reverse().toArray();
-        setMyIssues(issues);
+        const augmented = await Promise.all(
+          issues.map(async (iss) => {
+            const dec = iss.encrypted_phone ? await decryptPII(iss.encrypted_phone) : undefined;
+            return { ...iss, decryptedPhone: dec };
+          })
+        );
+        setMyIssues(augmented);
       } catch (err) {
         console.error('Error fetching my reports:', err);
       }
@@ -46,6 +56,12 @@ export const MyReportsView: React.FC = () => {
               <p className="timeline-description">
                 {issue.description || 'No description provided.'}
               </p>
+
+              {issue.decryptedPhone && (
+                <p className="timeline-phone-tag">
+                  📱 SMS Alert Contact: <strong>{issue.decryptedPhone}</strong>
+                </p>
+              )}
 
               {issue.photo_url && (
                 <img src={issue.photo_url} alt="Uploaded issue" className="timeline-photo-thumbnail" />

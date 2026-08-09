@@ -16,8 +16,9 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
   const [issues, setIssues] = useState<LocalIssue[]>([]);
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [selectedItem, setSelectedItem] = useState<{ title: string; type: string; details: string; status: string } | null>(null);
+  const [currentCoords, setCurrentCoords] = useState<{ lat: number; lng: number }>({ lat: 28.6139, lng: 77.2090 });
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4000/api';
+  const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4000/api';
 
   // Load local items from Dexie IndexedDB & fetch remote updates when online
   useEffect(() => {
@@ -120,6 +121,15 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localh
       attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map);
 
+    map.on('click', (e: L.LeafletMouseEvent) => {
+      setCurrentCoords({ lat: e.latlng.lat, lng: e.latlng.lng });
+    });
+
+    map.on('moveend', () => {
+      const center = map.getCenter();
+      setCurrentCoords({ lat: center.lat, lng: center.lng });
+    });
+
     leafletMap.current = map;
 
     return () => {
@@ -144,7 +154,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localh
     const createCustomIcon = (emoji: string, color: string) => {
       return L.divIcon({
         className: 'custom-map-pin',
-        html: `<div style="background-color: ${color}; width: 36px; height: 36px; borderRadius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); border: 2px solid white;">${emoji}</div>`,
+        html: `<div style="background-color: ${color}; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); border: 2px solid white;">${emoji}</div>`,
         iconSize: [36, 36],
         iconAnchor: [18, 18],
       });
@@ -229,7 +239,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localh
       {onReportIssueAtLocation && (
         <button 
           className="floating-thumb-cta"
-          onClick={() => onReportIssueAtLocation(28.6139, 77.2090)}
+          onClick={() => onReportIssueAtLocation(currentCoords.lat, currentCoords.lng)}
         >
           ➕ Report Issue Here
         </button>

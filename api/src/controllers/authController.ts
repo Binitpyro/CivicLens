@@ -3,6 +3,9 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { pool } from '../config/db';
 
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  console.warn('CRITICAL SECURITY WARNING: JWT_SECRET environment variable is missing in production!');
+}
 const JWT_SECRET = process.env.JWT_SECRET || 'civiclens-super-secret-key-2026';
 
 export async function login(req: Request, res: Response) {
@@ -47,17 +50,21 @@ export async function login(req: Request, res: Response) {
 
 export async function register(req: Request, res: Response) {
   try {
-    const { name, phone, password, role, ward_id } = req.body;
+    const { name, phone, password, ward_id } = req.body;
     if (!name || !phone || !password) {
       return res.status(400).json({ error: 'Name, phone, and password are required' });
     }
+
+    // Security: Public self-registration always defaults strictly to 'viewer'
+    // Prevents privilege escalation where attackers pass role: 'admin'
+    const assignedRole = 'viewer';
 
     const passwordHash = await bcrypt.hash(password, 10);
     const result = await pool.query(
       `INSERT INTO users (name, phone, password_hash, role, ward_id)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id, name, phone, role, ward_id`,
-      [name, phone, passwordHash, role || 'viewer', ward_id || 1]
+      [name, phone, passwordHash, assignedRole, ward_id || 1]
     );
 
     const newUser = result.rows[0];

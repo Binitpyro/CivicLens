@@ -1,6 +1,9 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  console.warn('CRITICAL SECURITY WARNING: JWT_SECRET environment variable is missing in production!');
+}
 const JWT_SECRET = process.env.JWT_SECRET || 'civiclens-super-secret-key-2026';
 
 export interface AuthRequest extends Request {

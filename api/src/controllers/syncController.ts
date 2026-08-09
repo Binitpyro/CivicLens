@@ -23,8 +23,19 @@ export async function processSyncBatch(req: AuthRequest, res: Response) {
     try {
       const { record_id, table_name, action, payload, client_seq_num } = item;
 
+      // 1. Handle Delete Action
+      if (action === 'delete') {
+        if (table_name === 'issues') {
+          await pool.query('DELETE FROM issues WHERE id = $1', [record_id]);
+        } else if (table_name === 'assets') {
+          await pool.query('DELETE FROM assets WHERE id = $1', [record_id]);
+        }
+        acks.push({ record_id, status: 'synced' });
+        continue;
+      }
+
       if (table_name === 'issues') {
-        const { asset_id, ward_id, category, severity, description, photo_url, latitude, longitude, status } = payload;
+        const { asset_id, ward_id, category, severity, description, photo_url, encrypted_phone, latitude, longitude, status } = payload;
         
         // Version vector check
         const existing = await pool.query('SELECT version_id, status FROM issues WHERE id = $1', [record_id]);
@@ -46,14 +57,15 @@ export async function processSyncBatch(req: AuthRequest, res: Response) {
         // Apply clean upsert
         await pool.query(
           `INSERT INTO issues (
-            id, asset_id, ward_id, category, severity, description, photo_url, location, status, client_seq_num, server_received_at
+            id, asset_id, ward_id, category, severity, description, photo_url, encrypted_phone, location, status, client_seq_num, server_received_at
            )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, ST_SetSRID(ST_MakePoint($8, $9), 4326), $10, $11, now())
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, ST_SetSRID(ST_MakePoint($9, $10), 4326), $11, $12, now())
            ON CONFLICT (id) DO UPDATE SET
              category = EXCLUDED.category,
              severity = EXCLUDED.severity,
              description = EXCLUDED.description,
              photo_url = COALESCE(EXCLUDED.photo_url, issues.photo_url),
+             encrypted_phone = COALESCE(EXCLUDED.encrypted_phone, issues.encrypted_phone),
              status = EXCLUDED.status,
              version_id = issues.version_id + 1,
              updated_at = now()`,
@@ -65,6 +77,7 @@ export async function processSyncBatch(req: AuthRequest, res: Response) {
             severity || 'medium', 
             description || '', 
             photo_url || null, 
+            encrypted_phone || null,
             longitude, 
             latitude, 
             status || 'open', 
@@ -75,7 +88,18 @@ export async function processSyncBatch(req: AuthRequest, res: Response) {
         acks.push({ record_id, status: 'synced' });
 
       } else if (table_name === 'assets') {
-        const { ward_id, asset_type, name, lbd_asset_id, status, latitude, longitude, attributes } = payload;
+        const { ward_id, asset_type, name, lbd_asset_id, status, latitude, longitude, attributes, version_id } = payload;
+
+        const existing = await pool.query('SELECT version_id FROM assets WHERE id = $1', [record_id]);
+        if (existing.rows.length > 0 && version_id && existing.rows[0].version_id > version_id) {
+          await pool.query(
+            `INSERT INTO sync_conflicts (record_id, table_name, client_payload, server_state, conflict_reason)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [record_id, table_name, JSON.stringify(payload), JSON.stringify(existing.rows[0]), 'Client version is behind server version']
+          );
+          acks.push({ record_id, status: 'conflict_logged' });
+          continue;
+        }
 
         await pool.query(
           `INSERT INTO assets (id, ward_id, asset_type, name, lbd_asset_id, status, location, attributes)

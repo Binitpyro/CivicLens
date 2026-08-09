@@ -14,6 +14,7 @@ import { ReportPrintView } from './views/ReportPrintView';
 export function App() {
   const [activeTab, setActiveTab] = useState<TabType>('map');
   const [isPrintView, setIsPrintView] = useState<boolean>(false);
+  const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   if (isPrintView) {
     return <ReportPrintView onBack={() => setIsPrintView(false)} />;
@@ -31,13 +32,20 @@ export function App() {
       <main className="main-content-viewport">
         {activeTab === 'map' && (
           <MapView 
-            onReportIssueAtLocation={() => setActiveTab('report')} 
+            onReportIssueAtLocation={(lat, lng) => {
+              setSelectedCoords({ lat, lng });
+              setActiveTab('report');
+            }} 
           />
         )}
 
         {activeTab === 'report' && (
           <ReportIssueForm 
-            onSuccess={() => setActiveTab('myReports')} 
+            initialCoords={selectedCoords}
+            onSuccess={() => {
+              setSelectedCoords(null);
+              setActiveTab('myReports');
+            }} 
           />
         )}
 
