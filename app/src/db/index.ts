@@ -42,17 +42,10 @@ export interface OutboxItem {
   created_at: string;
 }
 
-export interface TileCacheItem {
-  url: string;
-  blob: Blob;
-  timestamp: number;
-}
-
 class CivicLensDexie extends Dexie {
   assets!: Table<LocalAsset, string>;
   issues!: Table<LocalIssue, string>;
   outbox!: Table<OutboxItem, number>;
-  tiles!: Table<TileCacheItem, string>;
 
   constructor() {
     super('CivicLensDB');
@@ -60,7 +53,6 @@ class CivicLensDexie extends Dexie {
       assets: 'id, ward_id, asset_type, status, sync_state',
       issues: 'id, ward_id, category, severity, status, sync_state, client_seq_num',
       outbox: '++id, record_id, table_name, action, payload, client_seq_num, created_at',
-      tiles: 'url, timestamp'
     });
   }
 }
@@ -69,17 +61,23 @@ export const db = new CivicLensDexie();
 
 // Transparent AES-GCM-256 Web Crypto PII Encryption Helper
 const ENCRYPTION_KEY_STRING = 'civiclens-local-pii-secret-2026';
+let cachedCryptoKeyPromise: Promise<CryptoKey> | null = null;
 
-async function getCryptoKey(): Promise<CryptoKey> {
-  const enc = new TextEncoder();
-  const keyMaterial = await crypto.subtle.digest('SHA-256', enc.encode(ENCRYPTION_KEY_STRING));
-  return crypto.subtle.importKey(
-    'raw',
-    keyMaterial,
-    { name: 'AES-GCM' },
-    false,
-    ['encrypt', 'decrypt']
-  );
+function getCryptoKey(): Promise<CryptoKey> {
+  if (!cachedCryptoKeyPromise) {
+    cachedCryptoKeyPromise = (async () => {
+      const enc = new TextEncoder();
+      const keyMaterial = await crypto.subtle.digest('SHA-256', enc.encode(ENCRYPTION_KEY_STRING));
+      return crypto.subtle.importKey(
+        'raw',
+        keyMaterial,
+        { name: 'AES-GCM' },
+        false,
+        ['encrypt', 'decrypt']
+      );
+    })();
+  }
+  return cachedCryptoKeyPromise;
 }
 
 export async function encryptPII(text: string): Promise<string> {

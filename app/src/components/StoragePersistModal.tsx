@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { IconCheck } from './CivicIcons';
 
 export const StoragePersistModal: React.FC = () => {
   const [showModal, setShowModal] = useState<boolean>(false);
@@ -34,16 +35,18 @@ export const StoragePersistModal: React.FC = () => {
   return (
     <div className="persist-modal-overlay">
       <div className="persist-modal-box">
-        <div className="persist-icon">💾</div>
-        <h3>Save Maps & Reports Offline?</h3>
+        <div className="persist-icon">
+          <IconCheck size={22} color="var(--color-accent)" />
+        </div>
+        <h3>Save Maps & Reports Offline</h3>
         <p>
           Allow CivicLens to keep offline village maps and issue reports stored safely on your phone so your survey work is never deleted by the browser.
         </p>
         <div className="persist-actions">
-          <button className="btn-primary-persist" onClick={handleRequestPersistence}>
+          <button type="button" className="btn-primary-action" onClick={handleRequestPersistence}>
             Allow Offline Storage
           </button>
-          <button className="btn-secondary-persist" onClick={handleDismiss}>
+          <button type="button" className="filter-chip" style={{ width: '100%', justifyContent: 'center' }} onClick={handleDismiss}>
             Not Now
           </button>
         </div>

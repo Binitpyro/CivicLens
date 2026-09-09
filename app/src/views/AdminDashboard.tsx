@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { db } from '../db';
+import { 
+  IconPrinter, 
+  IconAlertTriangle 
+} from '../components/CivicIcons';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4000/api';
 
@@ -26,7 +29,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onOpenPrintView 
     categories: [],
     coverage_gaps: [
       { name: 'Govt Primary School Ward 3', type: 'School', gap: 'No active handpump within 500m' },
-      { name: 'Anganwadi Center Kalyanpur', type: 'Anganwadi', gap: 'No public toilet within 300m' },
+      { name: 'Anganwadi Center Kalyanpur', type: 'Anganwadi', gap: 'No public sanitation within 300m' },
     ],
   });
 
@@ -57,8 +60,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onOpenPrintView 
             }));
             return;
           }
-        } catch (err) {
-          console.warn('Failed to fetch online analytics summary, falling back to local database:', err);
+        } catch {
+          // Fallback to local
         }
       }
 
@@ -90,77 +93,103 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onOpenPrintView 
     loadAnalytics();
   }, []);
 
-  const COLORS = ['#0284c7', '#eab308', '#ea580c', '#16a34a', '#dc2626'];
-
   return (
-    <div className="admin-dashboard-container">
-      <div className="admin-header">
+    <div className="admin-dashboard-container" role="region" aria-label="Gram Panchayat Analytics">
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
-          <h2>📊 Gram Panchayat Admin Dashboard</h2>
-          <p className="subtext">Ward 3 (Kalyanpur) • Shivpur GP</p>
+          <h2 className="view-heading">Ward Overview</h2>
+          <p className="view-subheading">Panchayat Planning & Gram Sabha Metrics · Ward 3</p>
         </div>
-        <button className="btn-print-trigger" onClick={onOpenPrintView}>
-          🖨️ Export Gram Sabha Report
+        <button 
+          className="filter-chip"
+          style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-ink)', fontWeight: 600 }}
+          onClick={onOpenPrintView}
+          aria-label="Export official Gram Sabha Report"
+        >
+          <IconPrinter size={15} />
+          <span>Export Report</span>
         </button>
       </div>
 
-      {/* KPI Stats Cards */}
-      <div className="kpi-grid">
+      {/* KPI Matrix with Tabular Figures */}
+      <div className="kpi-matrix">
         <div className="kpi-card">
-          <span className="kpi-value">{data.assets_count}</span>
-          <span className="kpi-label">Geotagged Assets</span>
+          <div className="kpi-title">Geotagged Assets</div>
+          <div className="kpi-value tabular-nums">
+            {data.assets_count}
+          </div>
         </div>
         <div className="kpi-card">
-          <span className="kpi-value kpi-open">{data.open_issues}</span>
-          <span className="kpi-label">Open Grievances</span>
+          <div className="kpi-title">Open Grievances</div>
+          <div className="kpi-value tabular-nums" style={{ color: 'var(--color-status-urgent)' }}>
+            {data.open_issues}
+          </div>
         </div>
         <div className="kpi-card">
-          <span className="kpi-value kpi-resolved">{data.resolved_issues}</span>
-          <span className="kpi-label">Resolved Issues</span>
+          <div className="kpi-title">Resolved Issues</div>
+          <div className="kpi-value tabular-nums" style={{ color: 'var(--color-status-active)' }}>
+            {data.resolved_issues}
+          </div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-title">Resolution Rate</div>
+          <div className="kpi-value tabular-nums">
+            {data.issues_count > 0 ? `${Math.round((data.resolved_issues / data.issues_count) * 100)}%` : '—'}
+          </div>
         </div>
       </div>
 
-      {/* Issues by Category Chart (Recharts) */}
-      <div className="chart-card">
-        <h3>Grievance Categories Distribution</h3>
-        <div className="chart-container" style={{ width: '100%', height: 220 }}>
-          <ResponsiveContainer>
-            <BarChart data={data.categories} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                {data.categories.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+      {/* Grievance Category Distribution */}
+      <div className="admin-section-card">
+        <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+          Grievance Category Distribution
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {data.categories.length === 0 ? (
+            <p style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>No category data recorded yet.</p>
+          ) : (
+            data.categories.map((cat) => {
+              const maxCount = Math.max(...data.categories.map((c) => c.count), 1);
+              const pct = Math.round((cat.count / maxCount) * 100);
+              return (
+                <div key={cat.name} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                    <span style={{ color: 'var(--color-ink-2)' }}>{cat.name}</span>
+                    <span className="tabular-nums" style={{ fontWeight: 600, color: 'var(--color-ink)' }}>{cat.count}</span>
+                  </div>
+                  <div className="category-bar-track">
+                    <div className="category-bar-fill" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
-      {/* Spatial Coverage Gap Analysis (Buffer Analysis Results) */}
-      <div className="coverage-gaps-card">
-        <h3>📍 PostGIS Coverage Gap Detection</h3>
-        <p className="gap-subtext">Facilities requiring priority water & sanitation infrastructure:</p>
+      {/* Spatial Coverage Gaps */}
+      <div className="admin-section-card">
+        <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+          Service Coverage & Infrastructure Gaps
+        </h3>
+        <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginBottom: 14 }}>
+          Public facilities lacking active drinking water or sanitation access within proximity buffer:
+        </p>
 
-        <div className="gap-list">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {data.coverage_gaps.map((item, idx) => (
-            <div key={idx} className="gap-item">
-              <span className="gap-icon">⚠️</span>
-              <div>
-                <strong>{item.name}</strong> ({item.type})
-                <p className="gap-detail">{item.gap}</p>
+            <div key={idx} className="coverage-gap-item">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <IconAlertTriangle size={15} color="var(--color-status-urgent)" />
+                <strong style={{ fontSize: 13, color: 'var(--color-ink)' }}>{item.name}</strong>
+                <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>({item.type})</span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--color-status-urgent)', marginTop: 3, fontWeight: 500, paddingLeft: 21 }}>
+                {item.gap}
               </div>
             </div>
           ))}
         </div>
-      </div>
-
-      {/* Conflict Arbitration Notice */}
-      <div className="conflict-notice-card">
-        <h3>🛡️ Offline Sync Arbitration Engine</h3>
-        <p>No unresolved sync conflicts detected. Dual-timestamp sequence vector checks active.</p>
       </div>
     </div>
   );

@@ -1,24 +1,67 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import './i18n';
 import './App.css';
 import { Header } from './components/Header';
 import { BottomNav, type TabType } from './components/BottomNav';
 import { StoragePersistModal } from './components/StoragePersistModal';
-import { MapView } from './views/MapView';
-import { ReportIssueForm } from './views/ReportIssueForm';
-import { MyReportsView } from './views/MyReportsView';
-import { VolunteerQuickAdd } from './views/VolunteerQuickAdd';
-import { AdminDashboard } from './views/AdminDashboard';
-import { ReportPrintView } from './views/ReportPrintView';
+import type { UserProfile } from './services/apiService';
+
+// Code-split heavy view components for fast initial load
+const MapView = lazy(() => import('./views/MapView').then(m => ({ default: m.MapView })));
+const ReportIssueForm = lazy(() => import('./views/ReportIssueForm').then(m => ({ default: m.ReportIssueForm })));
+const MyReportsView = lazy(() => import('./views/MyReportsView').then(m => ({ default: m.MyReportsView })));
+const VolunteerQuickAdd = lazy(() => import('./views/VolunteerQuickAdd').then(m => ({ default: m.VolunteerQuickAdd })));
+const AdminDashboard = lazy(() => import('./views/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const ReportPrintView = lazy(() => import('./views/ReportPrintView').then(m => ({ default: m.ReportPrintView })));
+const AuthScreen = lazy(() => import('./views/AuthScreen').then(m => ({ default: m.AuthScreen })));
+
+function ViewLoadingFallback() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 280, gap: 12 }}>
+      <div style={{ width: 26, height: 26, border: '2px solid var(--color-rule)', borderTopColor: 'var(--color-accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <span style={{ fontSize: 13, color: 'var(--color-ink-muted)', fontFamily: 'var(--font-body)' }}>Loading…</span>
+    </div>
+  );
+}
 
 export function App() {
   const [activeTab, setActiveTab] = useState<TabType>('map');
   const [isPrintView, setIsPrintView] = useState<boolean>(false);
   const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(() => {
+    try {
+      const token = localStorage.getItem('civiclens_token');
+      const userData = localStorage.getItem('civiclens_user');
+      if (token && userData) {
+        return JSON.parse(userData);
+      }
+    } catch {
+      // invalid user data
+    }
+    return null;
+  });
+
+  if (!user) {
+    return (
+      <Suspense fallback={<ViewLoadingFallback />}>
+        <AuthScreen onAuthSuccess={setUser} />
+      </Suspense>
+    );
+  }
 
   if (isPrintView) {
-    return <ReportPrintView onBack={() => setIsPrintView(false)} />;
+    return (
+      <Suspense fallback={<ViewLoadingFallback />}>
+        <ReportPrintView onBack={() => setIsPrintView(false)} />
+      </Suspense>
+    );
   }
+
+  const handleLogout = () => {
+    localStorage.removeItem('civiclens_token');
+    localStorage.removeItem('civiclens_user');
+    setUser(null);
+  };
 
   return (
     <div className="app-mobile-shell">
@@ -26,38 +69,40 @@ export function App() {
       <StoragePersistModal />
 
       {/* Top Mobile Header */}
-      <Header />
+      <Header onLogout={handleLogout} />
 
       {/* Main View Area */}
       <main className="main-content-viewport">
-        {activeTab === 'map' && (
-          <MapView 
-            onReportIssueAtLocation={(lat, lng) => {
-              setSelectedCoords({ lat, lng });
-              setActiveTab('report');
-            }} 
-          />
-        )}
+        <Suspense fallback={<ViewLoadingFallback />}>
+          {activeTab === 'map' && (
+            <MapView 
+              onReportIssueAtLocation={(lat, lng) => {
+                setSelectedCoords({ lat, lng });
+                setActiveTab('report');
+              }} 
+            />
+          )}
 
-        {activeTab === 'report' && (
-          <ReportIssueForm 
-            initialCoords={selectedCoords}
-            onSuccess={() => {
-              setSelectedCoords(null);
-              setActiveTab('myReports');
-            }} 
-          />
-        )}
+          {activeTab === 'report' && (
+            <ReportIssueForm 
+              initialCoords={selectedCoords}
+              onSuccess={() => {
+                setSelectedCoords(null);
+                setActiveTab('myReports');
+              }} 
+            />
+          )}
 
-        {activeTab === 'myReports' && <MyReportsView />}
+          {activeTab === 'myReports' && <MyReportsView />}
 
-        {activeTab === 'quickAdd' && <VolunteerQuickAdd />}
+          {activeTab === 'quickAdd' && <VolunteerQuickAdd />}
 
-        {activeTab === 'admin' && (
-          <AdminDashboard 
-            onOpenPrintView={() => setIsPrintView(true)} 
-          />
-        )}
+          {activeTab === 'admin' && (
+            <AdminDashboard 
+              onOpenPrintView={() => setIsPrintView(true)} 
+            />
+          )}
+        </Suspense>
       </main>
 
       {/* Mobile Bottom Thumb Zone Navigation */}

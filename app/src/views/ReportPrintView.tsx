@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { db, type LocalAsset, type LocalIssue } from '../db';
+import { IconPrinter } from '../components/CivicIcons';
 
 interface ReportPrintViewProps {
   onBack: () => void;
@@ -30,8 +31,8 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
                 setCoverageGaps(gapData.features);
               }
             }
-          } catch (e) {
-            console.warn('Could not fetch online coverage gaps:', e);
+          } catch {
+            // Offline fallback
           }
         }
       } catch (err) {
@@ -41,7 +42,7 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
       }
     }
     loadReportData();
-  }, []);
+  }, [API_BASE]);
 
   const handlePrint = () => {
     window.print();
@@ -61,29 +62,43 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
   return (
     <div className="print-view-wrapper">
       <div className="print-header-actions no-print">
-        <button className="btn-back" onClick={onBack}>
+        <button 
+          type="button"
+          className="filter-chip"
+          style={{ padding: '8px 16px', fontWeight: 600 }}
+          onClick={onBack}
+        >
           ← Back to Dashboard
         </button>
-        <button className="btn-print-now" onClick={handlePrint} disabled={loading}>
-          🖨️ Print / Save as PDF
+        <button 
+          type="button"
+          className="filter-chip active"
+          style={{ padding: '8px 16px', fontWeight: 600 }}
+          onClick={handlePrint} 
+          disabled={loading}
+        >
+          <IconPrinter size={16} />
+          <span>Print / Save as PDF</span>
         </button>
       </div>
 
       <div className="printable-document">
         <div className="doc-header">
           <h1>GRAM PANCHAYAT INFRASTRUCTURE & GRIEVANCE REPORT</h1>
-          <h2>Gram Panchayat Monitoring Report — Ward 1</h2>
-          <p className="doc-meta">
+          <h2>Gram Panchayat Monitoring Report — Ward 3 (Kalyanpur)</h2>
+          <p className="doc-meta" style={{ fontSize: '12px', color: '#64748B', marginTop: 4 }}>
             Generated Date: {new Date().toLocaleDateString()} | System: CivicLens GIS Platform
           </p>
         </div>
 
-        <hr className="doc-divider" />
+        <hr style={{ border: 'none', borderTop: '1px solid #CBD5E1', margin: '16px 0' }} />
 
-        <section className="doc-section">
-          <h3>1. Executive Infrastructure Inventory</h3>
+        <section style={{ marginBottom: 24 }}>
+          <h3 style={{ fontSize: '14px', fontWeight: 700, marginBottom: 8, color: '#0F172A' }}>
+            1. Executive Infrastructure Inventory
+          </h3>
           {assetSummary.length === 0 ? (
-            <p className="doc-text">No geotagged assets recorded yet.</p>
+            <p style={{ fontSize: '13px', color: '#64748B' }}>No geotagged assets recorded yet.</p>
           ) : (
             <table className="doc-table">
               <thead>
@@ -97,10 +112,10 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
               <tbody>
                 {assetSummary.map((item) => (
                   <tr key={item.type}>
-                    <td>{item.type.replace('_', ' ').toUpperCase()}</td>
-                    <td>{item.total}</td>
-                    <td>{item.active}</td>
-                    <td>{item.nonFunctional}</td>
+                    <td style={{ fontWeight: 600 }}>{item.type.replace('_', ' ').toUpperCase()}</td>
+                    <td className="tabular-nums">{item.total}</td>
+                    <td className="tabular-nums" style={{ color: '#059669', fontWeight: 600 }}>{item.active}</td>
+                    <td className="tabular-nums" style={{ color: '#DC2626', fontWeight: 600 }}>{item.nonFunctional}</td>
                   </tr>
                 ))}
               </tbody>
@@ -108,17 +123,19 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
           )}
         </section>
 
-        <section className="doc-section">
-          <h3>2. High-Priority Grievances for Gram Sabha Resolution</h3>
+        <section style={{ marginBottom: 24 }}>
+          <h3 style={{ fontSize: '14px', fontWeight: 700, marginBottom: 8, color: '#0F172A' }}>
+            2. High-Priority Grievances for Gram Sabha Resolution
+          </h3>
           {activeGrievances.length === 0 ? (
-            <p className="doc-text">No open grievances pending resolution.</p>
+            <p style={{ fontSize: '13px', color: '#64748B' }}>No open grievances pending resolution.</p>
           ) : (
             <table className="doc-table">
               <thead>
                 <tr>
                   <th>Category</th>
-                  <th>Severity</th>
-                  <th>Coordinates (Lat, Lng)</th>
+                  <th>Urgency</th>
+                  <th>Coordinates</th>
                   <th>Description</th>
                   <th>Status</th>
                 </tr>
@@ -126,10 +143,10 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
               <tbody>
                 {activeGrievances.map((iss) => (
                   <tr key={iss.id}>
-                    <td>{iss.category}</td>
+                    <td style={{ fontWeight: 600 }}>{iss.category}</td>
                     <td>{iss.severity.toUpperCase()}</td>
-                    <td>{iss.latitude.toFixed(4)}, {iss.longitude.toFixed(4)}</td>
-                    <td>{iss.description || 'No description'}</td>
+                    <td className="tabular-nums">{iss.latitude.toFixed(5)}°N, {iss.longitude.toFixed(5)}°E</td>
+                    <td>{iss.description || 'No description recorded'}</td>
                     <td>{iss.status.toUpperCase()}</td>
                   </tr>
                 ))}
@@ -138,31 +155,33 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
           )}
         </section>
 
-        <section className="doc-section">
-          <h3>3. Coverage Gap Analysis</h3>
+        <section style={{ marginBottom: 32 }}>
+          <h3 style={{ fontSize: '14px', fontWeight: 700, marginBottom: 8, color: '#0F172A' }}>
+            3. Coverage Gap Analysis
+          </h3>
           {coverageGaps.length > 0 ? (
-            <div className="doc-gap-list">
+            <div>
               {coverageGaps.map((gap, idx) => (
-                <p key={gap.properties.id || idx} className="doc-text">
-                  <strong>Target Action Required:</strong> {gap.properties.name || gap.properties.type} — {gap.properties.gap_type}
+                <p key={gap.properties?.id || idx} style={{ fontSize: '13px', marginBottom: 4 }}>
+                  <strong>Target Action Required:</strong> {gap.properties?.name || gap.properties?.type} — {gap.properties?.gap_type}
                 </p>
               ))}
             </div>
           ) : (
-            <p className="doc-text">
-              <strong>Target Action Required:</strong> Schools and health facilities in Ward 1 currently have functional drinking water access within 500m buffer zone.
+            <p style={{ fontSize: '13px', color: '#334155' }}>
+              <strong>Target Action Required:</strong> Schools and health facilities in Ward 3 currently have functional drinking water access within 500m buffer zone.
             </p>
           )}
         </section>
 
-        <div className="doc-footer">
-          <div className="signature-box">
-            <p>Prepared By: ___________________</p>
-            <p>Gram Panchayat Secretary (Gram Sachiv)</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 48, paddingTop: 16, borderTop: '1px solid #CBD5E1' }}>
+          <div>
+            <p style={{ fontSize: '13px', fontWeight: 600 }}>Prepared By: ___________________</p>
+            <p style={{ fontSize: '11px', color: '#64748B', marginTop: 4 }}>Gram Panchayat Secretary (Gram Sachiv)</p>
           </div>
-          <div className="signature-box">
-            <p>Approved By: ___________________</p>
-            <p>Sarpanch / Ward Member</p>
+          <div>
+            <p style={{ fontSize: '13px', fontWeight: 600 }}>Approved By: ___________________</p>
+            <p style={{ fontSize: '11px', color: '#64748B', marginTop: 4 }}>Sarpanch / Ward Member</p>
           </div>
         </div>
       </div>

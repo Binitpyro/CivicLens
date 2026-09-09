@@ -93,16 +93,19 @@ export function useOfflineSync() {
       const data = await response.json();
       const acks: Array<{ record_id: string; status: string }> = data.acks || [];
 
-      // Purge synced items from outbox and update local sync_state to 'submitted'
-      for (const ack of acks) {
-        if (ack.status === 'synced' || ack.status === 'conflict_logged') {
-          // Remove from outbox
-          await db.outbox.where('record_id').equals(ack.record_id).delete();
-          
-          // Update issue sync_state in Dexie
-          await db.issues.where('id').equals(ack.record_id).modify({ sync_state: 'submitted' });
-          await db.assets.where('id').equals(ack.record_id).modify({ sync_state: 'submitted' });
-        }
+      // Purge synced items from outbox and update local sync_state to 'submitted' in an atomic transaction
+      const validRecordIds = acks
+        .filter(ack => ack.status === 'synced' || ack.status === 'conflict_logged')
+        .map(ack => ack.record_id);
+
+      if (validRecordIds.length > 0) {
+        await db.transaction('rw', [db.outbox, db.issues, db.assets], async () => {
+          for (const recordId of validRecordIds) {
+            await db.outbox.where('record_id').equals(recordId).delete();
+            await db.issues.where('id').equals(recordId).modify({ sync_state: 'submitted' });
+            await db.assets.where('id').equals(recordId).modify({ sync_state: 'submitted' });
+          }
+        });
       }
 
       await refreshOutboxCount();

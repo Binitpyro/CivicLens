@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import { login, register } from './controllers/authController';
 import { getAssetsGeoJSON, createAsset } from './controllers/assetController';
 import { getIssuesGeoJSON, createIssue, updateIssueStatus } from './controllers/issueController';
@@ -10,8 +11,17 @@ import { authenticateToken, requireRole } from './middleware/auth';
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// Cache-Control headers for high-frequency read endpoints
+app.use((req, res, next) => {
+  if (req.method === 'GET' && (req.path.startsWith('/api/assets') || req.path.startsWith('/api/issues') || req.path.startsWith('/api/analytics'))) {
+    res.setHeader('Cache-Control', 'public, max-age=15, stale-while-revalidate=60');
+  }
+  next();
+});
 
 // Health Check endpoint (used by 48h keep-alive script & Render)
 app.get('/api/health', (req, res) => {

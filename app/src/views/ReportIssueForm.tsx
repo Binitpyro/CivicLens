@@ -4,6 +4,13 @@ import { useGeolocation } from '../hooks/useGeolocation';
 import { compressPhotoOffThread } from '../services/photoWorker';
 import { db, encryptPII } from '../db';
 import { useOfflineSync } from '../hooks/useOfflineSync';
+import { 
+  getCategoryIcon, 
+  IconCamera, 
+  IconCrosshair, 
+  IconCheck, 
+  IconLock 
+} from '../components/CivicIcons';
 
 interface ReportIssueFormProps {
   onSuccess?: () => void;
@@ -11,12 +18,12 @@ interface ReportIssueFormProps {
 }
 
 const CATEGORIES = [
-  { id: 'Water Supply', icon: '🚰', labelKey: 'categories.water', color: '#0284c7' },
-  { id: 'Street Lighting', icon: '💡', labelKey: 'categories.lighting', color: '#eab308' },
-  { id: 'Public Sanitation', icon: '🚽', labelKey: 'categories.sanitation', color: '#16a34a' },
-  { id: 'Roads & Drains', icon: '🛣️', labelKey: 'categories.roads', color: '#ea580c' },
-  { id: 'Health (PHC)', icon: '🏥', labelKey: 'categories.health', color: '#dc2626' },
-  { id: 'School / Anganwadi', icon: '🏫', labelKey: 'categories.education', color: '#9333ea' },
+  { id: 'Water Supply', labelKey: 'categories.water' },
+  { id: 'Street Lighting', labelKey: 'categories.lighting' },
+  { id: 'Public Sanitation', labelKey: 'categories.sanitation' },
+  { id: 'Roads & Drains', labelKey: 'categories.roads' },
+  { id: 'Health (PHC)', labelKey: 'categories.health' },
+  { id: 'School / Anganwadi', labelKey: 'categories.education' },
 ];
 
 export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, initialCoords }) => {
@@ -36,7 +43,7 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Handle Photo Select and Off-Thread Web Worker Compression
+  // Handle Photo Select and Off-Thread Compression
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -47,7 +54,7 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
       setPhotoDataUrl(compressedUrl);
     } catch (err) {
       console.error('Error compressing photo:', err);
-      alert('Photo optimization failed. Please try another photo.');
+      alert('Photo optimization failed. Please try another image.');
     } finally {
       setCompressing(false);
     }
@@ -80,43 +87,41 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
         sync_state: 'saved' as const,
       };
 
-      // Write to Dexie Local Store
-      await db.issues.add(newIssuePayload);
-
-      // Write to Dexie Outbox Queue
-      await db.outbox.add({
-        record_id: issueId,
-        table_name: 'issues',
-        action: 'create',
-        payload: {
-          id: issueId,
-          ward_id: 1,
-          category,
-          severity,
-          description,
-          photo_url: photoDataUrl || null,
-          encrypted_phone: encryptedPhone || null,
-          latitude: latitude || 28.6139,
-          longitude: longitude || 77.2090,
-          status: 'open',
-        },
-        client_seq_num: clientSeqNum,
-        created_at: new Date().toISOString(),
+      // Write to Dexie Local Store & Outbox Queue atomically
+      await db.transaction('rw', [db.issues, db.outbox], async () => {
+        await db.issues.add(newIssuePayload);
+        await db.outbox.add({
+          record_id: issueId,
+          table_name: 'issues',
+          action: 'create',
+          payload: {
+            id: issueId,
+            ward_id: 1,
+            category,
+            severity,
+            description,
+            photo_url: photoDataUrl || null,
+            encrypted_phone: encryptedPhone || null,
+            latitude: latitude || 28.6139,
+            longitude: longitude || 77.2090,
+            status: 'open',
+          },
+          client_seq_num: clientSeqNum,
+          created_at: new Date().toISOString(),
+        });
       });
 
-      setSuccessMsg('✅ Issue saved safely on your phone! Syncing to Panchayat server...');
+      setSuccessMsg('Issue recorded on device. Will sync to Gram Panchayat server.');
       setSubmitting(false);
 
-      // Reset Form
       setDescription('');
       setPhotoDataUrl(null);
       setPhone('');
 
-      // Trigger background sync if online
       triggerSync();
 
       if (onSuccess) {
-        setTimeout(onSuccess, 1500);
+        setTimeout(onSuccess, 1000);
       }
     } catch (err) {
       console.error('Error submitting issue report:', err);
@@ -127,108 +132,198 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
 
   return (
     <div className="report-form-container">
-      <h2 className="form-heading">📢 {t('actions.reportIssue')}</h2>
+      <div className="form-header-card">
+        <h2 className="view-heading">{t('actions.reportIssue')}</h2>
+        <p className="view-subheading">Log public infrastructure issues for Gram Panchayat Ward 3.</p>
+      </div>
 
       {successMsg && (
-        <div className="form-success-banner">
-          {successMsg}
+        <div className="status-badge submitted" style={{ padding: '8px 12px', marginBottom: 16, width: '100%', borderRadius: 'var(--radius-sm)' }} role="alert">
+          <IconCheck size={16} />
+          <span>{successMsg}</span>
         </div>
       )}
 
       <form onSubmit={handleSubmit}>
-        {/* 1. Touch-First 48px Icon Category Selector */}
-        <label className="field-label">Select Issue Category</label>
-        <div className="category-grid">
-          {CATEGORIES.map((cat) => (
-            <button
-              type="button"
-              key={cat.id}
-              className={`category-card ${category === cat.id ? 'selected' : ''}`}
-              style={{ borderColor: category === cat.id ? cat.color : '#e2e8f0' }}
-              onClick={() => setCategory(cat.id)}
-            >
-              <span className="cat-icon">{cat.icon}</span>
-              <span className="cat-label">{t(cat.labelKey)}</span>
-            </button>
-          ))}
+        {/* 1. Category Selection */}
+        <h3 className="form-section-title">1. Category</h3>
+        <div className="category-selection-grid" role="radiogroup" aria-label="Incident category">
+          {CATEGORIES.map((cat) => {
+            const isSelected = category === cat.id;
+            return (
+              <button
+                type="button"
+                key={cat.id}
+                role="radio"
+                aria-checked={isSelected}
+                className={`category-card-btn ${isSelected ? 'active' : ''}`}
+                onClick={() => setCategory(cat.id)}
+              >
+                <div className="category-icon-box" aria-hidden="true">
+                  {getCategoryIcon(cat.id, 18)}
+                </div>
+                <span className="category-card-label">{t(cat.labelKey)}</span>
+              </button>
+            );
+          })}
         </div>
 
-        {/* 2. Severity Selector */}
-        <label className="field-label">Severity Level</label>
-        <div className="severity-selector">
-          {['low', 'medium', 'high', 'critical'].map((sev) => (
-            <button
-              type="button"
-              key={sev}
-              className={`sev-btn sev-${sev} ${severity === sev ? 'selected' : ''}`}
-              onClick={() => setSeverity(sev)}
-            >
-              {sev.toUpperCase()}
-            </button>
-          ))}
-        </div>
-
-        {/* 3. Single-Shot GPS Location Capture */}
-        <div className="location-box">
-          <div className="location-info">
-            <span>📍 Pin Location:</span>
-            <strong>
-              {latitude?.toFixed(4)}, {longitude?.toFixed(4)}
-            </strong>
-            {accuracy !== null && <span className="accuracy-tag">(±{accuracy}m)</span>}
-          </div>
-          <button type="button" className="btn-get-gps" onClick={getSingleFix} disabled={geoLoading}>
-            {geoLoading ? 'Acquiring GPS...' : '🎯 Update Location'}
+        {/* 2. Severity Segmented Control */}
+        <h3 className="form-section-title">2. Urgency Level</h3>
+        <div className="severity-segmented-bar" role="radiogroup" aria-label="Urgency level">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={severity === 'low'}
+            className={`severity-pill-btn ${severity === 'low' ? 'active-low' : ''}`}
+            onClick={() => setSeverity('low')}
+          >
+            Normal
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={severity === 'medium'}
+            className={`severity-pill-btn ${severity === 'medium' ? 'active-medium' : ''}`}
+            onClick={() => setSeverity('medium')}
+          >
+            Moderate
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={severity === 'high'}
+            className={`severity-pill-btn ${severity === 'high' ? 'active-high' : ''}`}
+            onClick={() => setSeverity('high')}
+          >
+            Urgent
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={severity === 'critical'}
+            className={`severity-pill-btn ${severity === 'critical' ? 'active-critical' : ''}`}
+            onClick={() => setSeverity('critical')}
+          >
+            Immediate
           </button>
         </div>
 
-        {/* 4. Asynchronous Photo Upload with Worker Compression */}
-        <label className="field-label">Attach Photo (Optional)</label>
-        <div className="photo-upload-box">
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            id="camera-input"
-            style={{ display: 'none' }}
-            onChange={handlePhotoSelect}
-          />
-          <label htmlFor="camera-input" className="btn-photo-trigger">
-            📷 {photoDataUrl ? 'Change Photo' : t('actions.takePhoto')}
-          </label>
-
-          {compressing && <div className="compressing-indicator">⏳ {t('actions.compressing')}</div>}
-
-          {photoDataUrl && (
-            <div className="photo-preview-container">
-              <img src={photoDataUrl} alt="Issue preview" className="photo-preview-img" />
-              <span className="photo-size-badge">Optimized (≤150KB, EXIF Cleaned)</span>
+        {/* 3. Location Coordinates */}
+        <h3 className="form-section-title">3. Location Coordinates</h3>
+        <div style={{
+          backgroundColor: 'var(--color-surface)',
+          border: '1px solid var(--color-rule)',
+          borderRadius: 'var(--radius-md)',
+          padding: '12px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 'var(--space-md)'
+        }}>
+          <div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>
+              {geoLoading ? (
+                <span>Acquiring GPS fix…</span>
+              ) : latitude ? (
+                <span className="tabular-nums">{latitude.toFixed(5)}°N, {longitude?.toFixed(5)}°E</span>
+              ) : (
+                <span>Coordinates unavailable</span>
+              )}
             </div>
-          )}
+            <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)', marginTop: 2 }}>
+              {accuracy !== null ? `Accuracy ±${accuracy}m` : 'Ward 3 · Kalyanpur'}
+            </div>
+          </div>
+          <button 
+            type="button" 
+            className="filter-chip"
+            onClick={getSingleFix} 
+            disabled={geoLoading}
+            aria-label="Refresh GPS coordinates"
+          >
+            <IconCrosshair size={14} />
+            <span>{geoLoading ? 'Fixing…' : 'Refresh'}</span>
+          </button>
         </div>
 
-        {/* 5. Optional Description & Encrypted Contact */}
-        <label className="field-label">Issue Details</label>
-        <textarea
-          className="input-textarea"
-          rows={3}
-          placeholder="Describe the broken handpump, road damage, or lighting issue..."
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
+        {/* 4. Photo Evidence */}
+        <h3 className="form-section-title">4. Photo Evidence</h3>
+        {photoDataUrl ? (
+          <div className="photo-preview-container">
+            <img src={photoDataUrl} alt="Issue preview" className="photo-preview-image" />
+            <button
+              type="button"
+              className="btn-remove-photo"
+              onClick={() => setPhotoDataUrl(null)}
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <div className="photo-upload-zone">
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              id="camera-input"
+              style={{ display: 'none' }}
+              onChange={handlePhotoSelect}
+            />
+            <label htmlFor="camera-input" style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: '100%' }}>
+              <div className="category-icon-box" style={{ width: 44, height: 44 }}>
+                <IconCamera size={22} />
+              </div>
+              <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-ink)' }}>
+                {compressing ? t('actions.compressing') : t('actions.takePhoto')}
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
+                Camera or gallery photo (auto-compressed on phone)
+              </span>
+            </label>
+          </div>
+        )}
 
-        <label className="field-label">Phone Number (Optional - Encrypted)</label>
-        <input
-          type="tel"
-          className="input-text"
-          placeholder="Enter 10-digit mobile number for status SMS"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-        />
+        {/* 5. Description */}
+        <div className="form-input-group">
+          <label htmlFor="issue-description" className="form-label">
+            Notes & Landmark Description
+          </label>
+          <textarea
+            id="issue-description"
+            className="form-textarea"
+            placeholder="Describe the issue, nearby house, or landmark..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+          />
+        </div>
 
-        {/* Submit CTA in Natural Thumb Zone */}
-        <button type="submit" className="btn-submit-issue" disabled={submitting || compressing}>
-          {submitting ? 'Saving to Phone...' : '🚀 Submit Report'}
+        {/* 6. Citizen Contact for Status Alert */}
+        <div className="form-input-group">
+          <label htmlFor="reporter-phone" className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <IconLock size={13} color="var(--color-ink-muted)" />
+            <span>Phone Number (Optional, for SMS status updates)</span>
+          </label>
+          <input
+            id="reporter-phone"
+            type="tel"
+            inputMode="tel"
+            className="form-input"
+            placeholder="e.g. 9876543210"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+        </div>
+
+        {/* Submit Button */}
+        <button 
+          type="submit" 
+          className="btn-primary-action" 
+          disabled={submitting || compressing}
+        >
+          <IconCheck size={18} />
+          <span>{submitting ? 'Saving to Device…' : t('actions.reportIssue')}</span>
         </button>
       </form>
     </div>

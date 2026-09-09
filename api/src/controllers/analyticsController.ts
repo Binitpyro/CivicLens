@@ -6,41 +6,37 @@ export async function getSummary(req: Request, res: Response) {
     const { ward_id } = req.query;
     const wardId = ward_id || 1;
 
-    // Asset count by type
-    const assetCounts = await pool.query(
-      `SELECT asset_type, COUNT(*) as count 
-       FROM assets 
-       WHERE ward_id = $1 
-       GROUP BY asset_type`,
-      [wardId]
-    );
-
-    // Issue count by category
-    const categoryCounts = await pool.query(
-      `SELECT category, COUNT(*) as count 
-       FROM issues 
-       WHERE ward_id = $1 
-       GROUP BY category`,
-      [wardId]
-    );
-
-    // Issue count by status
-    const statusCounts = await pool.query(
-      `SELECT status, COUNT(*) as count 
-       FROM issues 
-       WHERE ward_id = $1 
-       GROUP BY status`,
-      [wardId]
-    );
-
-    // Issue count by severity
-    const severityCounts = await pool.query(
-      `SELECT severity, COUNT(*) as count 
-       FROM issues 
-       WHERE ward_id = $1 
-       GROUP BY severity`,
-      [wardId]
-    );
+    // Parallel execution of summary aggregation queries
+    const [assetCounts, categoryCounts, statusCounts, severityCounts] = await Promise.all([
+      pool.query(
+        `SELECT asset_type, COUNT(*) as count 
+         FROM assets 
+         WHERE ward_id = $1 
+         GROUP BY asset_type`,
+        [wardId]
+      ),
+      pool.query(
+        `SELECT category, COUNT(*) as count 
+         FROM issues 
+         WHERE ward_id = $1 
+         GROUP BY category`,
+        [wardId]
+      ),
+      pool.query(
+        `SELECT status, COUNT(*) as count 
+         FROM issues 
+         WHERE ward_id = $1 
+         GROUP BY status`,
+        [wardId]
+      ),
+      pool.query(
+        `SELECT severity, COUNT(*) as count 
+         FROM issues 
+         WHERE ward_id = $1 
+         GROUP BY severity`,
+        [wardId]
+      ),
+    ]);
 
     return res.json({
       ward_id: wardId,

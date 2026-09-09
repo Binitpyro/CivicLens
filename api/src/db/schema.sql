@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS assets (
 );
 CREATE INDEX IF NOT EXISTS idx_assets_location ON assets USING GIST (location);
 CREATE INDEX IF NOT EXISTS idx_assets_type ON assets (asset_type);
+CREATE INDEX IF NOT EXISTS idx_assets_ward_id ON assets (ward_id);
 
 -- Grievances & Issues table
 CREATE TABLE IF NOT EXISTS issues (
@@ -74,6 +75,9 @@ CREATE TABLE IF NOT EXISTS issues (
 CREATE INDEX IF NOT EXISTS idx_issues_location ON issues USING GIST (location);
 CREATE INDEX IF NOT EXISTS idx_issues_status ON issues (status);
 CREATE INDEX IF NOT EXISTS idx_issues_category ON issues (category);
+CREATE INDEX IF NOT EXISTS idx_issues_ward_id ON issues (ward_id);
+CREATE INDEX IF NOT EXISTS idx_issues_ward_status ON issues (ward_id, status);
+CREATE INDEX IF NOT EXISTS idx_issues_reported_by ON issues (reported_by);
 
 -- Pre-aggregated spatial summary grid table (avoids dynamic ST_ClusterKMeans CPU spikes)
 CREATE TABLE IF NOT EXISTS spatial_grid_summary (
@@ -85,6 +89,7 @@ CREATE TABLE IF NOT EXISTS spatial_grid_summary (
   centroid GEOMETRY(POINT, 4326),
   last_updated TIMESTAMP DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS idx_spatial_grid_ward ON spatial_grid_summary (ward_id);
 
 -- Sync conflicts arbitration table
 CREATE TABLE IF NOT EXISTS sync_conflicts (

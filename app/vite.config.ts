@@ -48,4 +48,26 @@ export default defineConfig({
       }
     })
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          const normalized = id.replace(/\\/g, '/');
+          if (normalized.includes('/node_modules/react/') || normalized.includes('/node_modules/react-dom/')) {
+            return 'vendor-react';
+          }
+          if (normalized.includes('/node_modules/leaflet/') || normalized.includes('/node_modules/leaflet.markercluster/')) {
+            return 'vendor-leaflet';
+          }
+          if (normalized.includes('/node_modules/dexie/')) {
+            return 'vendor-storage';
+          }
+          if (normalized.includes('/node_modules/i18next/') || normalized.includes('/node_modules/react-i18next/')) {
+            return 'vendor-i18n';
+          }
+        },
+      },
+    },
+    chunkSizeWarningLimit: 600,
+  },
 })
