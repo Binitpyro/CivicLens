@@ -1,5 +1,5 @@
-/* Hallmark · CivicLens · index.css */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
+/* CivicLens global base */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import './tokens.css';
 
 * {
@@ -30,7 +30,7 @@ html, body {
   position: relative;
 }
 
-/* Standalone / Desktop App Container constraint (if on wide screen) */
+/* On wide screens, present the app as a framed mobile container */
 @media (min-width: 768px) {
   body {
     display: flex;

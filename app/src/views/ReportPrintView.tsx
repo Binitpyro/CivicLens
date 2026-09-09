@@ -48,7 +48,6 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
     window.print();
   };
 
-  // Group assets by type for dynamic summary table
   const assetTypes = Array.from(new Set(assets.map((a) => a.asset_type)));
   const assetSummary = assetTypes.map((type) => {
     const matching = assets.filter((a) => a.asset_type === type);
@@ -62,19 +61,17 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
   return (
     <div className="print-view-wrapper">
       <div className="print-header-actions no-print">
-        <button 
+        <button
           type="button"
-          className="filter-chip"
-          style={{ padding: '8px 16px', fontWeight: 600 }}
+          className="filter-chip chip-action"
           onClick={onBack}
         >
           ← Back to Dashboard
         </button>
-        <button 
+        <button
           type="button"
-          className="filter-chip active"
-          style={{ padding: '8px 16px', fontWeight: 600 }}
-          onClick={handlePrint} 
+          className="filter-chip active chip-action"
+          onClick={handlePrint}
           disabled={loading}
         >
           <IconPrinter size={16} />
@@ -86,19 +83,19 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
         <div className="doc-header">
           <h1>GRAM PANCHAYAT INFRASTRUCTURE & GRIEVANCE REPORT</h1>
           <h2>Gram Panchayat Monitoring Report — Ward 3 (Kalyanpur)</h2>
-          <p className="doc-meta" style={{ fontSize: '12px', color: '#64748B', marginTop: 4 }}>
+          <p className="doc-meta">
             Generated Date: {new Date().toLocaleDateString()} | System: CivicLens GIS Platform
           </p>
         </div>
 
-        <hr style={{ border: 'none', borderTop: '1px solid #CBD5E1', margin: '16px 0' }} />
+        <hr className="doc-rule" />
 
-        <section style={{ marginBottom: 24 }}>
-          <h3 style={{ fontSize: '14px', fontWeight: 700, marginBottom: 8, color: '#0F172A' }}>
+        <section className="doc-section">
+          <h3 className="doc-section-title">
             1. Executive Infrastructure Inventory
           </h3>
           {assetSummary.length === 0 ? (
-            <p style={{ fontSize: '13px', color: '#64748B' }}>No geotagged assets recorded yet.</p>
+            <p className="doc-note">No geotagged assets recorded yet.</p>
           ) : (
             <table className="doc-table">
               <thead>
@@ -112,10 +109,10 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
               <tbody>
                 {assetSummary.map((item) => (
                   <tr key={item.type}>
-                    <td style={{ fontWeight: 600 }}>{item.type.replace('_', ' ').toUpperCase()}</td>
+                    <td className="doc-cell-strong">{item.type.replace('_', ' ').toUpperCase()}</td>
                     <td className="tabular-nums">{item.total}</td>
-                    <td className="tabular-nums" style={{ color: '#059669', fontWeight: 600 }}>{item.active}</td>
-                    <td className="tabular-nums" style={{ color: '#DC2626', fontWeight: 600 }}>{item.nonFunctional}</td>
+                    <td className="tabular-nums doc-cell-ok">{item.active}</td>
+                    <td className="tabular-nums doc-cell-bad">{item.nonFunctional}</td>
                   </tr>
                 ))}
               </tbody>
@@ -123,12 +120,12 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
           )}
         </section>
 
-        <section style={{ marginBottom: 24 }}>
-          <h3 style={{ fontSize: '14px', fontWeight: 700, marginBottom: 8, color: '#0F172A' }}>
+        <section className="doc-section">
+          <h3 className="doc-section-title">
             2. High-Priority Grievances for Gram Sabha Resolution
           </h3>
           {activeGrievances.length === 0 ? (
-            <p style={{ fontSize: '13px', color: '#64748B' }}>No open grievances pending resolution.</p>
+            <p className="doc-note">No open grievances pending resolution.</p>
           ) : (
             <table className="doc-table">
               <thead>
@@ -143,7 +140,7 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
               <tbody>
                 {activeGrievances.map((iss) => (
                   <tr key={iss.id}>
-                    <td style={{ fontWeight: 600 }}>{iss.category}</td>
+                    <td className="doc-cell-strong">{iss.category}</td>
                     <td>{iss.severity.toUpperCase()}</td>
                     <td className="tabular-nums">{iss.latitude.toFixed(5)}°N, {iss.longitude.toFixed(5)}°E</td>
                     <td>{iss.description || 'No description recorded'}</td>
@@ -155,33 +152,33 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
           )}
         </section>
 
-        <section style={{ marginBottom: 32 }}>
-          <h3 style={{ fontSize: '14px', fontWeight: 700, marginBottom: 8, color: '#0F172A' }}>
+        <section className="doc-section">
+          <h3 className="doc-section-title">
             3. Coverage Gap Analysis
           </h3>
           {coverageGaps.length > 0 ? (
             <div>
               {coverageGaps.map((gap, idx) => (
-                <p key={gap.properties?.id || idx} style={{ fontSize: '13px', marginBottom: 4 }}>
+                <p key={gap.properties?.id || idx} className="doc-note" style={{ color: '#0F172A', marginBottom: 4 }}>
                   <strong>Target Action Required:</strong> {gap.properties?.name || gap.properties?.type} — {gap.properties?.gap_type}
                 </p>
               ))}
             </div>
           ) : (
-            <p style={{ fontSize: '13px', color: '#334155' }}>
+            <p className="doc-note" style={{ color: '#334155' }}>
               <strong>Target Action Required:</strong> Schools and health facilities in Ward 3 currently have functional drinking water access within 500m buffer zone.
             </p>
           )}
         </section>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 48, paddingTop: 16, borderTop: '1px solid #CBD5E1' }}>
+        <div className="doc-signoff">
           <div>
-            <p style={{ fontSize: '13px', fontWeight: 600 }}>Prepared By: ___________________</p>
-            <p style={{ fontSize: '11px', color: '#64748B', marginTop: 4 }}>Gram Panchayat Secretary (Gram Sachiv)</p>
+            <p className="doc-signoff-line">Prepared By: ___________________</p>
+            <p className="doc-signoff-role">Gram Panchayat Secretary (Gram Sachiv)</p>
           </div>
           <div>
-            <p style={{ fontSize: '13px', fontWeight: 600 }}>Approved By: ___________________</p>
-            <p style={{ fontSize: '11px', color: '#64748B', marginTop: 4 }}>Sarpanch / Ward Member</p>
+            <p className="doc-signoff-line">Approved By: ___________________</p>
+            <p className="doc-signoff-role">Sarpanch / Ward Member</p>
           </div>
         </div>
       </div>

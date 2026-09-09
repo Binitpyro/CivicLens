@@ -286,7 +286,7 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
       {/* Loading Skeleton */}
       {isDataLoading && (
         <div className="map-loading-skeleton">
-          <span style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>Loading Ward Map Data…</span>
+          <span className="map-loading-text">Loading Ward Map Data…</span>
         </div>
       )}
 
@@ -294,7 +294,7 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
       <div className="map-hud-overlay">
         <div className="hud-telemetry-pill">
           <span className="hud-gps-tag">
-            <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--color-status-active)' }}></span>
+            <span className="hud-gps-dot" />
             GPS
           </span>
           <span className="tabular-nums">{currentCoords.lat.toFixed(5)}°N, {currentCoords.lng.toFixed(5)}°E</span>
@@ -333,7 +333,7 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
 
       {/* Primary Action Button */}
       {onReportIssueAtLocation && (
-        <div style={{ position: 'absolute', bottom: 16, left: 16, right: 16, zIndex: 500 }}>
+        <div className="map-cta-bar">
           <button 
             type="button"
             className="btn-primary-action"
@@ -357,8 +357,8 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
             <span className={`status-badge ${selectedItem.status === 'active' || selectedItem.status === 'resolved' ? 'submitted' : 'urgent'}`}>
               {selectedItem.status.toUpperCase()}
             </span>
-            <p style={{ fontWeight: 600, marginTop: 8, color: 'var(--color-ink)' }}>{selectedItem.type}</p>
-            <p style={{ color: 'var(--color-ink-2)', marginTop: 4, lineHeight: 1.45 }}>{selectedItem.details}</p>
+            <p className="sheet-item-type">{selectedItem.type}</p>
+            <p className="sheet-item-details">{selectedItem.details}</p>
           </div>
         )}
       </BottomSheet>

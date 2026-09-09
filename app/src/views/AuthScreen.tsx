@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { loginUser, registerUser, type UserProfile } from '../services/apiService';
 import { setAppLanguage } from '../i18n';
-import { 
-  IconCivicLensLogo, 
-  IconCheck 
+import {
+  IconCivicLensLogo,
+  IconCheck
 } from '../components/CivicIcons';
 
 interface AuthScreenProps {
@@ -47,15 +47,15 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
       } else {
         res = await registerUser(name, phone, password);
       }
-      
+
       localStorage.setItem('civiclens_token', res.token);
       localStorage.setItem('civiclens_user', JSON.stringify(res.user));
       onAuthSuccess(res.user);
     } catch (err: any) {
       const errMsg = err?.message || '';
-      const isNetworkIssue = 
-        errMsg.includes('Failed to fetch') || 
-        errMsg.includes('Network') || 
+      const isNetworkIssue =
+        errMsg.includes('Failed to fetch') ||
+        errMsg.includes('Network') ||
         errMsg.includes('network') ||
         errMsg.includes('abort') ||
         errMsg.includes('timeout') ||
@@ -72,26 +72,10 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   };
 
   return (
-    <div style={{
-      position: 'relative',
-      display: 'flex',
-      flexDirection: 'column',
-      minHeight: '100vh',
-      backgroundColor: 'var(--color-paper)',
-      padding: 'var(--space-md)',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontFamily: 'var(--font-body)'
-    }}>
-      {/* Top Language Toggle Bar */}
-      <div style={{
-        position: 'absolute',
-        top: 'var(--space-md)',
-        right: 'var(--space-md)',
-        zIndex: 10
-      }}>
+    <div className="auth-screen">
+      <div className="auth-lang-bar">
         <div className="lang-selector" role="group" aria-label="Language selection">
-          <button 
+          <button
             type="button"
             className={i18n.language === 'en' ? 'active' : ''}
             onClick={() => setAppLanguage('en')}
@@ -99,7 +83,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           >
             EN
           </button>
-          <button 
+          <button
             type="button"
             className={i18n.language === 'hi' ? 'active' : ''}
             onClick={() => setAppLanguage('hi')}
@@ -107,7 +91,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           >
             HI
           </button>
-          <button 
+          <button
             type="button"
             className={i18n.language === 'mr' ? 'active' : ''}
             onClick={() => setAppLanguage('mr')}
@@ -118,50 +102,27 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
         </div>
       </div>
 
-      <div style={{ textAlign: 'center', marginBottom: 'var(--space-lg)' }}>
-        <div className="brand-icon-box" style={{ width: 48, height: 48, margin: '0 auto var(--space-xs) auto' }} aria-hidden="true">
+      <div className="auth-brand">
+        <div className="brand-icon-box auth-brand-icon" aria-hidden="true">
           <IconCivicLensLogo size={28} />
         </div>
-        <h1 style={{ color: 'var(--color-ink)', margin: 0, fontSize: 'var(--text-2xl)' }}>CivicLens</h1>
-        <p style={{ color: 'var(--color-ink-2)', margin: '4px 0 0 0', fontSize: 'var(--text-sm)' }}>
-          {t('tagline')}
-        </p>
+        <h1>CivicLens</h1>
+        <p>{t('tagline')}</p>
       </div>
 
-      <div style={{
-        width: '100%',
-        maxWidth: '400px',
-        backgroundColor: 'var(--color-surface)',
-        padding: 'var(--space-lg)',
-        borderRadius: 'var(--radius-md)',
-        border: '1px solid var(--color-rule)',
-        boxShadow: 'var(--shadow-card)'
-      }}>
-        <h2 style={{ color: 'var(--color-ink)', marginTop: 0, marginBottom: 'var(--space-md)', textAlign: 'center', fontSize: 'var(--text-lg)' }}>
-          {isLogin ? t('auth.login') : t('auth.register')}
-        </h2>
+      <div className="auth-card">
+        <h2>{isLogin ? t('auth.login') : t('auth.register')}</h2>
 
         {error && (
-          <div style={{
-            backgroundColor: 'var(--color-status-urgent-bg)',
-            border: '1px solid var(--color-status-urgent)',
-            color: 'var(--color-status-urgent)',
-            padding: '10px 12px',
-            borderRadius: 'var(--radius-sm)',
-            marginBottom: 'var(--space-md)',
-            fontSize: 'var(--text-xs)'
-          }}>
+          <div className="auth-error" role="alert">
             <div>{error}</div>
             {serverOffline && (
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed var(--color-status-urgent)' }}>
-                <p style={{ margin: '0 0 8px 0', color: 'var(--color-ink)', fontSize: '12px' }}>
-                  {t('auth.serverUnreachable')}
-                </p>
+              <div className="auth-error-offline">
+                <p>{t('auth.serverUnreachable')}</p>
                 <button
                   type="button"
                   onClick={() => handleOfflineLogin(name, phone)}
-                  className="filter-chip active"
-                  style={{ width: '100%', justifyContent: 'center' }}
+                  className="filter-chip active chip-block"
                 >
                   <IconCheck size={14} />
                   <span>{t('auth.useOfflineNow')}</span>
@@ -171,7 +132,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
+        <form onSubmit={handleSubmit} className="auth-form">
           {!isLogin && (
             <div className="form-input-group">
               <label htmlFor="auth-name" className="form-label">{t('auth.name')}</label>
@@ -212,54 +173,30 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
             />
           </div>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             className="btn-primary-action"
             disabled={loading}
-            style={{ marginTop: 4 }}
           >
             {loading ? 'Authenticating…' : (isLogin ? t('auth.loginBtn') : t('auth.registerBtn'))}
           </button>
         </form>
 
-        <div style={{ marginTop: 'var(--space-md)', textAlign: 'center' }}>
+        <div className="auth-switch">
           <button
             type="button"
             onClick={() => setIsLogin(!isLogin)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--color-accent)',
-              cursor: 'pointer',
-              fontSize: 'var(--text-xs)',
-              fontWeight: 600
-            }}
           >
             {isLogin ? t('auth.switchToRegister') : t('auth.switchToLogin')}
           </button>
         </div>
 
-        {/* Offline Demo / Test Bypass */}
-        <div style={{
-          marginTop: 'var(--space-md)',
-          paddingTop: 'var(--space-sm)',
-          borderTop: '1px solid var(--color-rule)',
-          textAlign: 'center'
-        }}>
-          <p style={{ margin: '0 0 8px 0', fontSize: '11px', color: 'var(--color-ink-muted)' }}>
-            {t('auth.offlineNotice')}
-          </p>
+        <div className="auth-offline-block">
+          <p>{t('auth.offlineNotice')}</p>
           <button
             type="button"
             onClick={() => handleOfflineLogin()}
-            className="filter-chip"
-            style={{
-              width: '100%',
-              justifyContent: 'center',
-              padding: '8px 12px',
-              color: 'var(--color-ink)',
-              fontWeight: 600
-            }}
+            className="filter-chip chip-block"
           >
             <IconCheck size={14} color="var(--color-status-active)" />
             <span>{t('auth.offlineMode')}</span>

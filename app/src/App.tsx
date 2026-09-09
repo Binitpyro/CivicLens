@@ -17,9 +17,9 @@ const AuthScreen = lazy(() => import('./views/AuthScreen').then(m => ({ default:
 
 function ViewLoadingFallback() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 280, gap: 12 }}>
-      <div style={{ width: 26, height: 26, border: '2px solid var(--color-rule)', borderTopColor: 'var(--color-accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-      <span style={{ fontSize: 13, color: 'var(--color-ink-muted)', fontFamily: 'var(--font-body)' }}>Loading…</span>
+    <div className="view-loading">
+      <div className="spinner" />
+      <span className="view-loading-text">Loading…</span>
     </div>
   );
 }
@@ -65,31 +65,28 @@ export function App() {
 
   return (
     <div className="app-mobile-shell">
-      {/* Storage Persistence Prompt Modal */}
       <StoragePersistModal />
 
-      {/* Top Mobile Header */}
       <Header onLogout={handleLogout} />
 
-      {/* Main View Area */}
       <main className="main-content-viewport">
         <Suspense fallback={<ViewLoadingFallback />}>
           {activeTab === 'map' && (
-            <MapView 
+            <MapView
               onReportIssueAtLocation={(lat, lng) => {
                 setSelectedCoords({ lat, lng });
                 setActiveTab('report');
-              }} 
+              }}
             />
           )}
 
           {activeTab === 'report' && (
-            <ReportIssueForm 
+            <ReportIssueForm
               initialCoords={selectedCoords}
               onSuccess={() => {
                 setSelectedCoords(null);
                 setActiveTab('myReports');
-              }} 
+              }}
             />
           )}
 
@@ -98,17 +95,16 @@ export function App() {
           {activeTab === 'quickAdd' && <VolunteerQuickAdd />}
 
           {activeTab === 'admin' && (
-            <AdminDashboard 
-              onOpenPrintView={() => setIsPrintView(true)} 
+            <AdminDashboard
+              onOpenPrintView={() => setIsPrintView(true)}
             />
           )}
         </Suspense>
       </main>
 
-      {/* Mobile Bottom Thumb Zone Navigation */}
-      <BottomNav 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
+      <BottomNav
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
       />
     </div>
   );

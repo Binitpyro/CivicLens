@@ -4,12 +4,12 @@ import { useGeolocation } from '../hooks/useGeolocation';
 import { compressPhotoOffThread } from '../services/photoWorker';
 import { db, encryptPII } from '../db';
 import { useOfflineSync } from '../hooks/useOfflineSync';
-import { 
-  getCategoryIcon, 
-  IconCamera, 
-  IconCrosshair, 
-  IconCheck, 
-  IconLock 
+import {
+  getCategoryIcon,
+  IconCamera,
+  IconCrosshair,
+  IconCheck,
+  IconLock
 } from '../components/CivicIcons';
 
 interface ReportIssueFormProps {
@@ -43,7 +43,6 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Handle Photo Select and Off-Thread Compression
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -60,7 +59,6 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
     }
   };
 
-  // Submit Issue Report
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -87,7 +85,6 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
         sync_state: 'saved' as const,
       };
 
-      // Write to Dexie Local Store & Outbox Queue atomically
       await db.transaction('rw', [db.issues, db.outbox], async () => {
         await db.issues.add(newIssuePayload);
         await db.outbox.add({
@@ -138,14 +135,13 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
       </div>
 
       {successMsg && (
-        <div className="status-badge submitted" style={{ padding: '8px 12px', marginBottom: 16, width: '100%', borderRadius: 'var(--radius-sm)' }} role="alert">
+        <div className="notice-banner" role="alert">
           <IconCheck size={16} />
           <span>{successMsg}</span>
         </div>
       )}
 
       <form onSubmit={handleSubmit}>
-        {/* 1. Category Selection */}
         <h3 className="form-section-title">1. Category</h3>
         <div className="category-selection-grid" role="radiogroup" aria-label="Incident category">
           {CATEGORIES.map((cat) => {
@@ -168,7 +164,6 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
           })}
         </div>
 
-        {/* 2. Severity Segmented Control */}
         <h3 className="form-section-title">2. Urgency Level</h3>
         <div className="severity-segmented-bar" role="radiogroup" aria-label="Urgency level">
           <button
@@ -209,20 +204,10 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
           </button>
         </div>
 
-        {/* 3. Location Coordinates */}
         <h3 className="form-section-title">3. Location Coordinates</h3>
-        <div style={{
-          backgroundColor: 'var(--color-surface)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-md)',
-          padding: '12px 14px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 'var(--space-md)'
-        }}>
+        <div className="gps-fix-card">
           <div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>
+            <div className="gps-fix-coords">
               {geoLoading ? (
                 <span>Acquiring GPS fix…</span>
               ) : latitude ? (
@@ -231,14 +216,14 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
                 <span>Coordinates unavailable</span>
               )}
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)', marginTop: 2 }}>
+            <div className="gps-fix-meta">
               {accuracy !== null ? `Accuracy ±${accuracy}m` : 'Ward 3 · Kalyanpur'}
             </div>
           </div>
-          <button 
-            type="button" 
+          <button
+            type="button"
             className="filter-chip"
-            onClick={getSingleFix} 
+            onClick={getSingleFix}
             disabled={geoLoading}
             aria-label="Refresh GPS coordinates"
           >
@@ -247,7 +232,6 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
           </button>
         </div>
 
-        {/* 4. Photo Evidence */}
         <h3 className="form-section-title">4. Photo Evidence</h3>
         {photoDataUrl ? (
           <div className="photo-preview-container">
@@ -267,24 +251,23 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
               accept="image/*"
               capture="environment"
               id="camera-input"
-              style={{ display: 'none' }}
+              className="photo-upload-input"
               onChange={handlePhotoSelect}
             />
-            <label htmlFor="camera-input" style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: '100%' }}>
-              <div className="category-icon-box" style={{ width: 44, height: 44 }}>
+            <label htmlFor="camera-input" className="photo-upload-label">
+              <div className="category-icon-box photo-upload-icon">
                 <IconCamera size={22} />
               </div>
-              <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-ink)' }}>
+              <span className="photo-upload-title">
                 {compressing ? t('actions.compressing') : t('actions.takePhoto')}
               </span>
-              <span style={{ fontSize: '11px', color: 'var(--color-ink-muted)' }}>
+              <span className="photo-upload-hint">
                 Camera or gallery photo (auto-compressed on phone)
               </span>
             </label>
           </div>
         )}
 
-        {/* 5. Description */}
         <div className="form-input-group">
           <label htmlFor="issue-description" className="form-label">
             Notes & Landmark Description
@@ -299,9 +282,8 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
           />
         </div>
 
-        {/* 6. Citizen Contact for Status Alert */}
         <div className="form-input-group">
-          <label htmlFor="reporter-phone" className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <label htmlFor="reporter-phone" className="form-label form-label-with-icon">
             <IconLock size={13} color="var(--color-ink-muted)" />
             <span>Phone Number (Optional, for SMS status updates)</span>
           </label>
@@ -316,10 +298,9 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
           />
         </div>
 
-        {/* Submit Button */}
-        <button 
-          type="submit" 
-          className="btn-primary-action" 
+        <button
+          type="submit"
+          className="btn-primary-action"
           disabled={submitting || compressing}
         >
           <IconCheck size={18} />

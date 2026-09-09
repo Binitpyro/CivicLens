@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { db } from '../db';
 import { useOfflineSync } from '../hooks/useOfflineSync';
-import { 
-  getAssetTypeIcon, 
-  IconCrosshair, 
-  IconCheck 
+import {
+  getAssetTypeIcon,
+  IconCrosshair,
+  IconCheck
 } from '../components/CivicIcons';
 
 const ASSET_TYPES = [
@@ -47,7 +47,6 @@ export const VolunteerQuickAdd: React.FC = () => {
         sync_state: 'saved' as const,
       };
 
-      // Atomic transaction for Asset and Outbox Queue write
       await db.transaction('rw', [db.assets, db.outbox], async () => {
         await db.assets.add(newAsset);
         await db.outbox.add({
@@ -76,7 +75,6 @@ export const VolunteerQuickAdd: React.FC = () => {
       setSavedNotice(true);
       setTimeout(() => setSavedNotice(false), 2000);
 
-      // Refresh location for next point
       getSingleFix();
       triggerSync();
     } catch (err) {
@@ -87,7 +85,7 @@ export const VolunteerQuickAdd: React.FC = () => {
   return (
     <div className="report-form-container" role="region" aria-label="Field Asset Rapid Survey">
       <div className="form-header-card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="admin-header">
           <h2 className="view-heading">Rapid Field Survey</h2>
           <span className="status-badge submitted tabular-nums">
             {counter} Logged
@@ -97,14 +95,13 @@ export const VolunteerQuickAdd: React.FC = () => {
       </div>
 
       {savedNotice && (
-        <div className="status-badge submitted" style={{ padding: '8px 12px', marginBottom: 16, width: '100%', borderRadius: 'var(--radius-sm)' }}>
+        <div className="notice-banner">
           <IconCheck size={16} />
           <span>Asset #{counter} saved to local survey log!</span>
         </div>
       )}
 
       <form onSubmit={handleQuickAdd}>
-        {/* 1. Asset Type Selection */}
         <h3 className="form-section-title">1. Select Asset Type</h3>
         <div className="category-selection-grid" role="radiogroup" aria-label="Asset Type">
           {ASSET_TYPES.map((type) => {
@@ -127,20 +124,10 @@ export const VolunteerQuickAdd: React.FC = () => {
           })}
         </div>
 
-        {/* 2. Coordinates */}
         <h3 className="form-section-title">2. Location Coordinates</h3>
-        <div style={{
-          backgroundColor: 'var(--color-surface)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-md)',
-          padding: '12px 14px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 'var(--space-md)'
-        }}>
+        <div className="gps-fix-card">
           <div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>
+            <div className="gps-fix-coords">
               {geoLoading ? (
                 <span>Acquiring GPS fix…</span>
               ) : latitude ? (
@@ -149,14 +136,14 @@ export const VolunteerQuickAdd: React.FC = () => {
                 <span>Coordinates unavailable</span>
               )}
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--color-ink-muted)', marginTop: 2 }}>
+            <div className="gps-fix-meta">
               {accuracy !== null ? `Accuracy ±${accuracy}m` : 'Ward 3 · Kalyanpur'}
             </div>
           </div>
-          <button 
-            type="button" 
+          <button
+            type="button"
             className="filter-chip"
-            onClick={getSingleFix} 
+            onClick={getSingleFix}
             disabled={geoLoading}
             aria-label="Refresh GPS coordinates"
           >
@@ -165,7 +152,6 @@ export const VolunteerQuickAdd: React.FC = () => {
           </button>
         </div>
 
-        {/* 3. Operational Status */}
         <h3 className="form-section-title">3. Operational Status</h3>
         <div className="severity-segmented-bar" role="radiogroup" aria-label="Operational status">
           <button
@@ -188,7 +174,6 @@ export const VolunteerQuickAdd: React.FC = () => {
           </button>
         </div>
 
-        {/* 4. Asset Tag */}
         <div className="form-input-group">
           <label htmlFor="asset-name" className="form-label">
             Asset Name or Landmark (Optional)
@@ -219,8 +204,8 @@ export const VolunteerQuickAdd: React.FC = () => {
           />
         </div>
 
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           className="btn-primary-action"
           aria-label="Record asset to local database and advance to next"
         >

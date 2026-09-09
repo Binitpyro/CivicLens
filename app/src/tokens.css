@@ -1,40 +1,42 @@
-/* Hallmark · tokens.css · design-system: design.md · CivicLens */
+/* CivicLens design tokens — single source of truth for color, type, space. */
 
 :root {
-  /* Light Mode (Field Sun-Readable Canvas) */
-  --color-paper:        oklch(98% 0.006 85);
-  --color-paper-2:      oklch(99.5% 0.003 85);
-  --color-paper-subtle: oklch(95.5% 0.008 85);
-  --color-surface:      oklch(99.5% 0.003 85);
-  --color-rule:         oklch(88% 0.010 85);
-  --color-rule-strong:  oklch(76% 0.015 85);
+  /* Surfaces */
+  --color-paper:        #F7F8FA;
+  --color-paper-2:      #FFFFFF;
+  --color-paper-subtle: #EFF1F4;
+  --color-surface:      #FFFFFF;
+  --color-rule:         #E2E5EA;
+  --color-rule-strong:  #C9CED6;
 
-  --color-ink:          oklch(20% 0.015 65);
-  --color-ink-2:        oklch(46% 0.012 65);
-  --color-ink-muted:    oklch(62% 0.010 65);
+  /* Text */
+  --color-ink:          #0F172A;
+  --color-ink-2:        #475569;
+  --color-ink-muted:    #64748B;
 
-  /* Anchor Accent: Civic Terracotta / Brick (≤ 3% viewport coverage) */
-  --color-accent:       oklch(52% 0.15 45);
-  --color-accent-subtle:oklch(94% 0.03 45);
-  --color-accent-ink:   oklch(99% 0.005 85);
-  --color-focus:        oklch(52% 0.15 45);
+  /* Accent — single restrained municipal blue */
+  --color-accent:        #1D4ED8;
+  --color-accent-hover:  #1E40AF;
+  --color-accent-subtle: #EEF2FF;
+  --color-accent-ink:    #FFFFFF;
+  --color-focus:         #1D4ED8;
 
-  /* Semantic Status Tokens */
-  --color-status-active:    oklch(52% 0.14 150); /* Forest Pine */
-  --color-status-active-bg: oklch(95% 0.03 150);
-  --color-status-pending:   oklch(65% 0.15 75);  /* Warm Ochre */
-  --color-status-pending-bg:oklch(96% 0.04 75);
-  --color-status-urgent:    oklch(52% 0.18 28);  /* Brick Crimson */
-  --color-status-urgent-bg: oklch(95% 0.04 28);
-  --color-status-info:      oklch(54% 0.14 240); /* Municipal Slate Blue */
-  --color-status-info-bg:   oklch(95% 0.03 240);
+  /* Semantic status */
+  --color-status-active:     #15803D;
+  --color-status-active-bg:  #F0FDF4;
+  --color-status-pending:    #B45309;
+  --color-status-pending-bg: #FFFBEB;
+  --color-status-urgent:     #B91C1C;
+  --color-status-urgent-bg:  #FEF2F2;
+  --color-status-info:       #0369A1;
+  --color-status-info-bg:    #F0F9FF;
 
-  /* Typography (2+1 Canon) */
-  --font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-body:    'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Typography */
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  /* 4pt Spacing Scale */
+  /* 4pt spacing scale */
   --space-3xs: 2px;
   --space-2xs: 4px;
   --space-xs:  8px;
@@ -45,60 +47,61 @@
   --space-2xl: 48px;
   --space-3xl: 64px;
 
-  /* Type Scale */
-  --text-2xs: 0.6875rem; /* 11px */
-  --text-xs:  0.75rem;   /* 12px */
-  --text-sm:  0.875rem;  /* 14px */
-  --text-base:1rem;      /* 16px */
-  --text-md:  1.125rem;  /* 18px */
-  --text-lg:  1.25rem;   /* 20px */
-  --text-xl:  1.5rem;    /* 24px */
-  --text-2xl: 1.875rem;  /* 30px */
+  /* Type scale */
+  --text-2xs: 0.6875rem;
+  --text-xs:  0.75rem;
+  --text-sm:  0.875rem;
+  --text-base:1rem;
+  --text-md:  1.125rem;
+  --text-lg:  1.25rem;
+  --text-xl:  1.5rem;
+  --text-2xl: 1.875rem;
 
-  /* Border Radii */
+  /* Radii */
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
+  --radius-pill: 9999px;
   --radius-full: 9999px;
 
-  /* Shadows (Restrained, Crisp Municipal Elevation) */
+  /* Elevation */
   --shadow-subtle: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --shadow-card:   0 2px 4px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-card:   0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
   --shadow-modal:  0 12px 28px rgba(15, 23, 42, 0.12), 0 2px 4px rgba(15, 23, 42, 0.06);
 
-  /* Motion & Easings */
+  /* Motion */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-fast: 150ms;
   --dur-normal: 220ms;
 }
 
 [data-theme="dark"] {
-  /* Dark Mode (Field Night Slate) */
-  --color-paper:        oklch(18% 0.012 65);
-  --color-paper-2:      oklch(22% 0.014 65);
-  --color-paper-subtle: oklch(25% 0.014 65);
-  --color-surface:      oklch(22% 0.014 65);
-  --color-rule:         oklch(30% 0.012 65);
-  --color-rule-strong:  oklch(42% 0.015 65);
+  --color-paper:        #0B1120;
+  --color-paper-2:      #111827;
+  --color-paper-subtle: #1E293B;
+  --color-surface:      #111827;
+  --color-rule:         #24304A;
+  --color-rule-strong:  #3B4A68;
 
-  --color-ink:          oklch(94% 0.008 85);
-  --color-ink-2:        oklch(76% 0.010 85);
-  --color-ink-muted:    oklch(58% 0.010 85);
+  --color-ink:          #F1F5F9;
+  --color-ink-2:        #B6C2D2;
+  --color-ink-muted:    #8A99B0;
 
-  --color-accent:       oklch(68% 0.16 45);
-  --color-accent-subtle:oklch(28% 0.04 45);
-  --color-accent-ink:   oklch(15% 0.015 65);
-  --color-focus:        oklch(68% 0.16 45);
+  --color-accent:        #60A5FA;
+  --color-accent-hover:  #93C5FD;
+  --color-accent-subtle: rgba(96, 165, 250, 0.12);
+  --color-accent-ink:    #0B1120;
+  --color-focus:         #60A5FA;
 
-  --color-status-active:    oklch(68% 0.14 150);
-  --color-status-active-bg: oklch(26% 0.04 150);
-  --color-status-pending:   oklch(74% 0.15 75);
-  --color-status-pending-bg:oklch(28% 0.04 75);
-  --color-status-urgent:    oklch(68% 0.18 28);
-  --color-status-urgent-bg: oklch(28% 0.05 28);
-  --color-status-info:      oklch(68% 0.14 240);
-  --color-status-info-bg:   oklch(26% 0.04 240);
+  --color-status-active:     #4ADE80;
+  --color-status-active-bg:  rgba(74, 222, 128, 0.10);
+  --color-status-pending:    #FBBF24;
+  --color-status-pending-bg: rgba(251, 191, 36, 0.10);
+  --color-status-urgent:     #F87171;
+  --color-status-urgent-bg:  rgba(248, 113, 113, 0.10);
+  --color-status-info:       #38BDF8;
+  --color-status-info-bg:    rgba(56, 189, 248, 0.10);
 
   --shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.35);
   --shadow-card:   0 2px 4px rgba(0, 0, 0, 0.45);

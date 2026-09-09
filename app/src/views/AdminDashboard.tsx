@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../db';
-import { 
-  IconPrinter, 
-  IconAlertTriangle 
+import {
+  IconPrinter,
+  IconAlertTriangle
 } from '../components/CivicIcons';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4000/api';
@@ -44,7 +44,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onOpenPrintView 
             const openCount = summary.issues_by_status?.find((s: any) => s.status === 'open')?.count || 0;
             const resolvedCount = summary.issues_by_status?.find((s: any) => s.status === 'resolved')?.count || 0;
             const totalIssues = summary.issues_by_category?.reduce((acc: number, curr: any) => acc + parseInt(curr.count, 10), 0) || 0;
-            
+
             const cats = summary.issues_by_category?.map((c: any) => ({
               name: c.category,
               count: parseInt(c.count, 10),
@@ -65,13 +65,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onOpenPrintView 
         }
       }
 
-      // Offline fallback from Dexie
       try {
         const localAssets = await db.assets.count();
         const localIssues = await db.issues.toArray();
         const open = localIssues.filter(i => i.status === 'open').length;
         const resolved = localIssues.filter(i => i.status === 'resolved').length;
-        
+
         const catMap: Record<string, number> = {};
         localIssues.forEach(i => {
           catMap[i.category] = (catMap[i.category] || 0) + 1;
@@ -95,14 +94,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onOpenPrintView 
 
   return (
     <div className="admin-dashboard-container" role="region" aria-label="Gram Panchayat Analytics">
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div className="admin-header">
         <div>
           <h2 className="view-heading">Ward Overview</h2>
           <p className="view-subheading">Panchayat Planning & Gram Sabha Metrics · Ward 3</p>
         </div>
-        <button 
-          className="filter-chip"
-          style={{ backgroundColor: 'var(--color-surface)', color: 'var(--color-ink)', fontWeight: 600 }}
+        <button
+          className="filter-chip chip-action"
           onClick={onOpenPrintView}
           aria-label="Export official Gram Sabha Report"
         >
@@ -111,7 +109,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onOpenPrintView 
         </button>
       </div>
 
-      {/* KPI Matrix with Tabular Figures */}
       <div className="kpi-matrix">
         <div className="kpi-card">
           <div className="kpi-title">Geotagged Assets</div>
@@ -121,13 +118,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onOpenPrintView 
         </div>
         <div className="kpi-card">
           <div className="kpi-title">Open Grievances</div>
-          <div className="kpi-value tabular-nums" style={{ color: 'var(--color-status-urgent)' }}>
+          <div className="kpi-value tabular-nums is-urgent">
             {data.open_issues}
           </div>
         </div>
         <div className="kpi-card">
           <div className="kpi-title">Resolved Issues</div>
-          <div className="kpi-value tabular-nums" style={{ color: 'var(--color-status-active)' }}>
+          <div className="kpi-value tabular-nums is-active">
             {data.resolved_issues}
           </div>
         </div>
@@ -139,52 +136,50 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onOpenPrintView 
         </div>
       </div>
 
-      {/* Grievance Category Distribution */}
       <div className="admin-section-card">
-        <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+        <h3 className="admin-section-title">
           Grievance Category Distribution
         </h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {data.categories.length === 0 ? (
-            <p style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>No category data recorded yet.</p>
-          ) : (
-            data.categories.map((cat) => {
+        {data.categories.length === 0 ? (
+          <p className="admin-empty-note">No category data recorded yet.</p>
+        ) : (
+          <div className="category-bar-list">
+            {data.categories.map((cat) => {
               const maxCount = Math.max(...data.categories.map((c) => c.count), 1);
               const pct = Math.round((cat.count / maxCount) * 100);
               return (
-                <div key={cat.name} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                    <span style={{ color: 'var(--color-ink-2)' }}>{cat.name}</span>
-                    <span className="tabular-nums" style={{ fontWeight: 600, color: 'var(--color-ink)' }}>{cat.count}</span>
+                <div key={cat.name} className="category-bar-item">
+                  <div className="category-bar-meta">
+                    <span className="category-bar-name">{cat.name}</span>
+                    <span className="tabular-nums category-bar-count">{cat.count}</span>
                   </div>
                   <div className="category-bar-track">
                     <div className="category-bar-fill" style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Spatial Coverage Gaps */}
       <div className="admin-section-card">
-        <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+        <h3 className="admin-section-title" style={{ marginBottom: 4 }}>
           Service Coverage & Infrastructure Gaps
         </h3>
-        <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginBottom: 14 }}>
+        <p className="admin-section-subtitle">
           Public facilities lacking active drinking water or sanitation access within proximity buffer:
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="coverage-gap-list">
           {data.coverage_gaps.map((item, idx) => (
             <div key={idx} className="coverage-gap-item">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div className="coverage-gap-head">
                 <IconAlertTriangle size={15} color="var(--color-status-urgent)" />
-                <strong style={{ fontSize: 13, color: 'var(--color-ink)' }}>{item.name}</strong>
-                <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>({item.type})</span>
+                <strong className="coverage-gap-name">{item.name}</strong>
+                <span className="coverage-gap-type">({item.type})</span>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--color-status-urgent)', marginTop: 3, fontWeight: 500, paddingLeft: 21 }}>
+              <div className="coverage-gap-detail">
                 {item.gap}
               </div>
             </div>

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { db, decryptPII, type LocalIssue } from '../db';
 import { useTranslation } from 'react-i18next';
-import { 
-  getCategoryIcon, 
-  IconClipboard, 
-  IconLock 
+import {
+  getCategoryIcon,
+  IconClipboard,
+  IconLock
 } from '../components/CivicIcons';
 
 interface IssueWithDecryptedPhone extends LocalIssue {
@@ -69,22 +69,12 @@ export const MyReportsView: React.FC = () => {
       </div>
 
       {myIssues.length === 0 ? (
-        <div style={{
-          backgroundColor: 'var(--color-surface)',
-          border: '1px solid var(--color-rule)',
-          borderRadius: 'var(--radius-md)',
-          padding: '36px 20px',
-          textAlign: 'center',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '12px'
-        }}>
-          <div className="category-icon-box" style={{ width: 48, height: 48 }}>
+        <div className="empty-state">
+          <div className="category-icon-box empty-state-icon">
             <IconClipboard size={24} />
           </div>
-          <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-ink)' }}>No Grievances Recorded Yet</h3>
-          <p style={{ fontSize: '13px', color: 'var(--color-ink-2)', maxWidth: '280px', lineHeight: 1.45 }}>
+          <h3>No Grievances Recorded Yet</h3>
+          <p>
             Use the Report tab to log a broken handpump, road damage, or failed streetlight in your ward.
           </p>
         </div>
@@ -109,23 +99,20 @@ export const MyReportsView: React.FC = () => {
               </p>
 
               {issue.decryptedPhone && (
-                <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
+                <div className="incident-contact">
                   <IconLock size={12} />
                   <span>SMS Contact: <strong className="tabular-nums">{issue.decryptedPhone}</strong></span>
                 </div>
               )}
 
               {issue.photo_url && (
-                <div className="photo-preview-container" style={{ maxHeight: 150, marginBottom: 8 }}>
+                <div className="photo-preview-container incident-photo">
                   <img src={issue.photo_url} alt="Attached incident evidence" className="photo-preview-image" style={{ maxHeight: 150 }} />
                 </div>
               )}
 
               <div className="incident-footer">
-                <span style={{ 
-                  fontWeight: 600, 
-                  color: issue.status === 'resolved' ? 'var(--color-status-active)' : 'var(--color-status-urgent)' 
-                }}>
+                <span className={`incident-status ${issue.status === 'resolved' ? 'is-resolved' : 'is-open'}`}>
                   {issue.status.toUpperCase()}
                 </span>
                 <span className="tabular-nums">

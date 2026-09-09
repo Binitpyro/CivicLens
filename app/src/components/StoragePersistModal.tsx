@@ -46,7 +46,7 @@ export const StoragePersistModal: React.FC = () => {
           <button type="button" className="btn-primary-action" onClick={handleRequestPersistence}>
             Allow Offline Storage
           </button>
-          <button type="button" className="filter-chip" style={{ width: '100%', justifyContent: 'center' }} onClick={handleDismiss}>
+          <button type="button" className="btn-secondary" onClick={handleDismiss}>
             Not Now
           </button>
         </div>
