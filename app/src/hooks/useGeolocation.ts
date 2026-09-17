@@ -1,69 +1,145 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 
 export interface LocationState {
-  latitude: number | null;
-  longitude: number | null;
-  accuracy: number | null; // meters
+  latitude: number;
+  longitude: number;
+  accuracy: number | null; // in meters
+  heading: number | null; // in degrees (0-360)
+  speed: number | null; // in m/s
+  altitude: number | null;
   loading: boolean;
   error: string | null;
+  isLive: boolean;
+  timestamp: number | null;
 }
 
 export function useGeolocation() {
   const [location, setLocation] = useState<LocationState>({
-    latitude: 28.6139,  // Default fallback (Delhi/Shivpur pilot area)
+    latitude: 28.6139,
     longitude: 77.2090,
     accuracy: null,
+    heading: null,
+    speed: null,
+    altitude: null,
     loading: false,
     error: null,
+    isLive: false,
+    timestamp: null,
   });
 
-  const getSingleFix = useCallback(() => {
+  const watchIdRef = useRef<number | null>(null);
+
+  // High precision single fix with maximumAge: 0 (zero cached position delay)
+  const locateMe = useCallback(() => {
     if (!navigator.geolocation) {
-      setLocation(prev => ({ ...prev, error: 'Geolocation is not supported by your browser' }));
+      setLocation((prev) => ({ ...prev, error: 'Geolocation is not supported by your browser' }));
       return;
     }
 
-    setLocation(prev => ({ ...prev, loading: true, error: null }));
+    setLocation((prev) => ({ ...prev, loading: true, error: null }));
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        const { latitude, longitude, accuracy, heading, speed, altitude } = position.coords;
         setLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: Math.round(position.coords.accuracy),
+          latitude,
+          longitude,
+          accuracy: Number.isFinite(accuracy) ? accuracy : null,
+          heading: heading ?? null,
+          speed: speed ?? null,
+          altitude: altitude ?? null,
           loading: false,
           error: null,
+          isLive: true,
+          timestamp: position.timestamp || Date.now(),
         });
       },
       (error) => {
-        console.warn('Geolocation acquisition warning:', error.message);
-        setLocation(prev => ({
+        console.warn('High precision GPS warning:', error.message);
+        setLocation((prev) => ({
           ...prev,
           loading: false,
-          error: 'GPS signal weak. Using pin location on map.',
+          error: 'Unable to fetch high precision GPS position.',
         }));
       },
       {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 60000,
+        maximumAge: 0, // Force fresh hardware fix
       }
     );
   }, []);
 
-  const setManualLocation = useCallback((lat: number, lng: number) => {
-    setLocation({
-      latitude: lat,
-      longitude: lng,
-      accuracy: 0,
-      loading: false,
-      error: null,
-    });
+  // Continuous high precision position watcher
+  const startLiveWatch = useCallback(() => {
+    if (!navigator.geolocation || watchIdRef.current !== null) return;
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude, accuracy, heading, speed, altitude } = position.coords;
+        setLocation({
+          latitude,
+          longitude,
+          accuracy: Number.isFinite(accuracy) ? accuracy : null,
+          heading: heading ?? null,
+          speed: speed ?? null,
+          altitude: altitude ?? null,
+          loading: false,
+          error: null,
+          isLive: true,
+          timestamp: position.timestamp || Date.now(),
+        });
+      },
+      (error) => {
+        console.warn('Live high-precision location watch warning:', error.message);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0, // Fresh hardware GPS fixes
+      }
+    );
   }, []);
+
+  const stopLiveWatch = useCallback(() => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+  }, []);
+
+  // Device Orientation listener for compass heading beam
+  useEffect(() => {
+    const handleOrientation = (event: DeviceOrientationEvent) => {
+      if (event.alpha !== null && event.alpha !== undefined) {
+        // webkitCompassHeading for iOS, alpha for Android
+        const compassHeading = (event as any).webkitCompassHeading ?? (360 - event.alpha);
+        if (!isNaN(compassHeading)) {
+          setLocation((prev) => ({ ...prev, heading: Math.round(compassHeading) }));
+        }
+      }
+    };
+
+    if (window.DeviceOrientationEvent) {
+      window.addEventListener('deviceorientation', handleOrientation, true);
+    }
+    return () => {
+      if (window.DeviceOrientationEvent) {
+        window.removeEventListener('deviceorientation', handleOrientation, true);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    startLiveWatch();
+    return () => {
+      stopLiveWatch();
+    };
+  }, [startLiveWatch, stopLiveWatch]);
 
   return {
     ...location,
-    getSingleFix,
-    setManualLocation,
+    locateMe,
+    getSingleFix: locateMe,
   };
 }

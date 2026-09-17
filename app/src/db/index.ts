@@ -42,10 +42,22 @@ export interface OutboxItem {
   created_at: string;
 }
 
+export interface LocationLog {
+  id?: number;
+  timestamp: number;
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  speed?: number | null;
+  altitude?: number | null;
+  heading?: number | null;
+}
+
 class CivicLensDexie extends Dexie {
   assets!: Table<LocalAsset, string>;
   issues!: Table<LocalIssue, string>;
   outbox!: Table<OutboxItem, number>;
+  locationLogs!: Table<LocationLog, number>;
 
   constructor() {
     super('CivicLensDB');
@@ -53,6 +65,12 @@ class CivicLensDexie extends Dexie {
       assets: 'id, ward_id, asset_type, status, sync_state',
       issues: 'id, ward_id, category, severity, status, sync_state, client_seq_num',
       outbox: '++id, record_id, table_name, action, payload, client_seq_num, created_at',
+    });
+    this.version(2).stores({
+      assets: 'id, ward_id, asset_type, status, sync_state',
+      issues: 'id, ward_id, category, severity, status, sync_state, client_seq_num',
+      outbox: '++id, record_id, table_name, action, payload, client_seq_num, created_at',
+      locationLogs: '++id, timestamp, latitude, longitude',
     });
   }
 }

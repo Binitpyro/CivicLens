@@ -12,8 +12,10 @@ import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 
 import { db, type LocalAsset, type LocalIssue } from '../db';
 import { initializeLocalSeedData } from '../utils/seedLoader';
+import { spatialIndex } from '../utils/spatialIndex';
+import { useGeolocation } from '../hooks/useGeolocation';
 import { BottomSheet } from '../components/BottomSheet';
-import { IconPlus } from '../components/CivicIcons';
+import { IconPlus, IconGpsTarget } from '../components/CivicIcons';
 
 // Crisp inline SVGs for Leaflet DivIcons
 const SVG_ICONS: Record<string, string> = {
@@ -52,6 +54,12 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
   const leafletMap = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const hasFittedBoundsRef = useRef<boolean>(false);
+  const shouldCenterOnUserRef = useRef<boolean>(false);
+
+  const userMarkerRef = useRef<L.Marker | null>(null);
+  const userAccuracyCircleRef = useRef<L.Circle | null>(null);
+
+  const { latitude: userLat, longitude: userLng, accuracy: userAccuracy, heading: userHeading, isLive, locateMe } = useGeolocation();
 
   const [assets, setAssets] = useState<LocalAsset[]>([]);
   const [issues, setIssues] = useState<LocalIssue[]>([]);
@@ -74,6 +82,8 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
         const localIssues = await db.issues.toArray();
 
         if (isMounted) {
+          spatialIndex.setAssets(localAssets);
+          spatialIndex.setIssues(localIssues);
           setAssets(localAssets);
           setIssues(localIssues);
           setIsDataLoading(false);
@@ -108,7 +118,10 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
                   version_id: f.properties.version_id || 1,
                   sync_state: 'submitted' as const,
                 }));
-                if (isMounted) setAssets(remoteAssets);
+                if (isMounted) {
+                  spatialIndex.setAssets(remoteAssets);
+                  setAssets(remoteAssets);
+                }
               }
             }
 
@@ -130,7 +143,10 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
                   date_reported: f.properties.date_reported || new Date().toISOString(),
                   sync_state: 'submitted' as const,
                 }));
-                if (isMounted) setIssues(remoteIssues);
+                if (isMounted) {
+                  spatialIndex.setIssues(remoteIssues);
+                  setIssues(remoteIssues);
+                }
               }
             }
           } catch {
@@ -149,7 +165,7 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
     };
   }, [API_BASE]);
 
-  // 2. Initialize Leaflet Map
+  // 2. Initialize Leaflet Map with Canvas renderer & High-Performance Cluster Group
   useEffect(() => {
     if (!mapRef.current || leafletMap.current) return;
 
@@ -157,6 +173,7 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
     const defaultLng = 77.2090;
 
     const map = L.map(mapRef.current, {
+      preferCanvas: true, // Canvas Renderer for zero SVG DOM jank
       center: [defaultLat, defaultLng],
       zoom: 15,
       zoomControl: false,
@@ -171,9 +188,13 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
 
     const clusterGroup = (L as any).markerClusterGroup({
       showCoverageOnHover: false,
-      maxClusterRadius: 36,
+      maxClusterRadius: 40,
       spiderfyOnMaxZoom: true,
       disableClusteringAtZoom: 17,
+      chunkedLoading: true,            // Chunked async loading for 10,000+ features
+      chunkInterval: 100,              // Process 100ms chunks
+      chunkDelay: 50,                  // 50ms pause between chunks to keep UI responsive
+      removeOutsideVisibleBounds: true,// Unload off-screen markers automatically
     });
     map.addLayer(clusterGroup);
     markersLayerRef.current = clusterGroup;
@@ -245,7 +266,6 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
           status: asset.status,
         });
       });
-      markersLayer.addLayer(marker);
       addedMarkers.push(marker);
     });
 
@@ -265,9 +285,17 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
           status: issue.status,
         });
       });
-      markersLayer.addLayer(marker);
       addedMarkers.push(marker);
     });
+
+    // High performance bulk add in a single spatial pass
+    if (addedMarkers.length > 0) {
+      if (typeof (markersLayer as any).addLayers === 'function') {
+        (markersLayer as any).addLayers(addedMarkers);
+      } else {
+        addedMarkers.forEach((m) => markersLayer.addLayer(m));
+      }
+    }
 
     map.invalidateSize();
     if (!hasFittedBoundsRef.current && addedMarkers.length > 0) {
@@ -281,8 +309,98 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
     }
   }, [assets, issues, activeFilter]);
 
+  const hasAutoCenteredRef = useRef<boolean>(false);
+
+  // 4. Google Maps Authentic Live Blue Dot & Accuracy Ring
+  useEffect(() => {
+    const map = leafletMap.current;
+    if (!map || !isLive || !Number.isFinite(userLat) || !Number.isFinite(userLng)) return;
+
+    const userLatLng = L.latLng(userLat, userLng);
+    setCurrentCoords({ lat: userLat, lng: userLng });
+
+    const headingSvg = userHeading !== null && userHeading !== undefined
+      ? `<svg class="gmaps-heading-beam" style="transform: rotate(${userHeading}deg);" viewBox="0 0 100 100"><path d="M50 50 L20 0 A55 55 0 0 1 80 0 Z" fill="url(#gmapsHeadingGrad)" opacity="0.5"/><defs><linearGradient id="gmapsHeadingGrad" x1="0%" y1="100%" x2="0%" y2="0%"><stop offset="0%" stop-color="#1A73E8" stop-opacity="0.9"/><stop offset="100%" stop-color="#4285F4" stop-opacity="0"/></linearGradient></defs></svg>`
+      : '';
+
+    const gmapsBlueDotHtml = `
+      <div class="gmaps-blue-dot-wrap">
+        ${headingSvg}
+        <div class="gmaps-blue-dot-pulse"></div>
+        <div class="gmaps-blue-dot-core"></div>
+      </div>
+    `;
+
+    const gmapsIcon = L.divIcon({
+      className: 'gmaps-blue-dot-leaflet-icon',
+      html: gmapsBlueDotHtml,
+      iconSize: [48, 48],
+      iconAnchor: [24, 24],
+    });
+
+    // Create or update Google Maps Blue Dot Marker
+    if (!userMarkerRef.current) {
+      userMarkerRef.current = L.marker(userLatLng, {
+        icon: gmapsIcon,
+        zIndexOffset: 2000,
+        interactive: false,
+      }).addTo(map);
+    } else {
+      userMarkerRef.current.setLatLng(userLatLng);
+      userMarkerRef.current.setIcon(gmapsIcon);
+    }
+
+    // Create or update Google Maps Precision Accuracy Circle
+    if (userAccuracy) {
+      if (!userAccuracyCircleRef.current) {
+        userAccuracyCircleRef.current = L.circle(userLatLng, {
+          radius: userAccuracy,
+          color: '#1A73E8',
+          fillColor: '#4285F4',
+          fillOpacity: 0.14,
+          weight: 1,
+        }).addTo(map);
+      } else {
+        userAccuracyCircleRef.current.setLatLng(userLatLng);
+        userAccuracyCircleRef.current.setRadius(userAccuracy);
+      }
+    }
+
+    // Auto-center map over user's live blue dot on first fix or button press
+    if (!hasAutoCenteredRef.current || shouldCenterOnUserRef.current) {
+      hasAutoCenteredRef.current = true;
+      shouldCenterOnUserRef.current = false;
+      map.flyTo(userLatLng, 16, {
+        animate: true,
+        duration: 1.2,
+      });
+    }
+  }, [userLat, userLng, userAccuracy, userHeading, isLive]);
+
+  const handleLocateMe = () => {
+    shouldCenterOnUserRef.current = true;
+    locateMe();
+    if (leafletMap.current && Number.isFinite(userLat) && Number.isFinite(userLng)) {
+      leafletMap.current.flyTo([userLat, userLng], 16, {
+        animate: true,
+        duration: 1.2,
+      });
+    }
+  };
+
   return (
     <div className="map-view-container" role="region" aria-label="GIS Interactive Map">
+      {/* Floating GPS Target Button */}
+      <button
+        type="button"
+        className={`btn-locate-me ${isLive ? 'active' : ''}`}
+        onClick={handleLocateMe}
+        title="Locate My Live Position"
+        aria-label="Locate My Live Position"
+      >
+        <IconGpsTarget size={22} />
+      </button>
+
       {/* Loading Skeleton */}
       {isDataLoading && (
         <div className="map-loading-skeleton">
@@ -295,9 +413,9 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
         <div className="hud-telemetry-pill">
           <span className="hud-gps-tag">
             <span className="hud-gps-dot" />
-            GPS
+            GPS {userAccuracy !== null && userAccuracy !== undefined ? `±${userAccuracy}m` : 'EXACT'}
           </span>
-          <span className="tabular-nums">{currentCoords.lat.toFixed(5)}°N, {currentCoords.lng.toFixed(5)}°E</span>
+          <span className="tabular-nums">{currentCoords.lat.toFixed(6)}°N, {currentCoords.lng.toFixed(6)}°E</span>
         </div>
 
         <div className="map-filter-chips" role="toolbar" aria-label="Map filters">

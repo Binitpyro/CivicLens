@@ -4,7 +4,10 @@ import type { AuthRequest } from '../middleware/auth';
 
 export async function getAssetsGeoJSON(req: Request, res: Response) {
   try {
-    const { type, ward_id } = req.query;
+    const { type, ward_id, minLng, minLat, maxLng, maxLat, simplifyTolerance } = req.query;
+    const tol = simplifyTolerance ? parseFloat(simplifyTolerance as string) : 0;
+    const geomExpr = tol > 0 ? `ST_SimplifyPreserveTopology(location, ${tol})` : 'location';
+
     let query = `
       SELECT 
         id, 
@@ -15,7 +18,7 @@ export async function getAssetsGeoJSON(req: Request, res: Response) {
         status, 
         attributes, 
         version_id,
-        ST_AsGeoJSON(location)::json AS geometry
+        ST_AsGeoJSON(${geomExpr})::json AS geometry
       FROM assets
       WHERE 1=1
     `;
@@ -28,6 +31,19 @@ export async function getAssetsGeoJSON(req: Request, res: Response) {
     if (ward_id) {
       params.push(ward_id);
       query += ` AND ward_id = $${params.length}`;
+    }
+
+    if (minLng && minLat && maxLng && maxLat) {
+      const pMinLng = parseFloat(minLng as string);
+      const pMinLat = parseFloat(minLat as string);
+      const pMaxLng = parseFloat(maxLng as string);
+      const pMaxLat = parseFloat(maxLat as string);
+
+      if (!isNaN(pMinLng) && !isNaN(pMinLat) && !isNaN(pMaxLng) && !isNaN(pMaxLat)) {
+        params.push(pMinLng, pMinLat, pMaxLng, pMaxLat);
+        const idx = params.length - 3;
+        query += ` AND location && ST_MakeEnvelope($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, 4326)`;
+      }
     }
 
     const result = await pool.query(query, params);

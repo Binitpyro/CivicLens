@@ -28,7 +28,7 @@ const CATEGORIES = [
 
 export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, initialCoords }) => {
   const { t } = useTranslation();
-  const { latitude: geoLat, longitude: geoLng, accuracy, loading: geoLoading, getSingleFix } = useGeolocation();
+  const { latitude: geoLat, longitude: geoLng, accuracy, loading: geoLoading, locateMe } = useGeolocation();
   const { triggerSync } = useOfflineSync();
 
   const latitude = initialCoords?.lat ?? geoLat;
