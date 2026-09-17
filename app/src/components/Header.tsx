@@ -21,13 +21,13 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ theme = 'light', onToggleTheme, onLogout }) => {
   const { t, i18n } = useTranslation();
   const { isOnline, outboxCount, isSyncing, coldStartNotice, triggerSync } = useOfflineSync();
-  const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>(theme);
+  const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('civiclens-theme') as 'dark' | 'light') || theme;
+  });
 
   useEffect(() => {
-    const saved = (localStorage.getItem('civiclens-theme') as 'dark' | 'light') || 'light';
-    setCurrentTheme(saved);
-    document.documentElement.setAttribute('data-theme', saved);
-  }, []);
+    document.documentElement.setAttribute('data-theme', currentTheme);
+  }, [currentTheme]);
 
   const handleToggle = () => {
     const next = currentTheme === 'dark' ? 'light' : 'dark';

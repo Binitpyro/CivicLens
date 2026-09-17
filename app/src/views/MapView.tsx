@@ -354,8 +354,20 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
       >
         {selectedItem && (
           <div>
-            <span className={`status-badge ${selectedItem.status === 'active' || selectedItem.status === 'resolved' ? 'submitted' : 'urgent'}`}>
-              {selectedItem.status.toUpperCase()}
+            <span className={`status-badge ${
+              selectedItem.status === 'active' || selectedItem.status === 'resolved'
+                ? 'submitted'
+                : selectedItem.status === 'needs_repair' || selectedItem.status === 'in_progress'
+                ? 'syncing'
+                : 'urgent'
+            }`}>
+              {selectedItem.status === 'active'
+                ? 'OPERATIONAL'
+                : selectedItem.status === 'needs_repair'
+                ? 'NEEDS REPAIR'
+                : selectedItem.status === 'under_construction'
+                ? 'UNDER CONSTRUCTION'
+                : selectedItem.status.replace('_', ' ').toUpperCase()}
             </span>
             <p className="sheet-item-type">{selectedItem.type}</p>
             <p className="sheet-item-details">{selectedItem.details}</p>

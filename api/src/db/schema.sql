@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS assets (
   )),
   name TEXT,
   lbd_asset_id TEXT,
-  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'non_functional', 'under_construction')),
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'needs_repair', 'non_functional', 'under_construction')),
   location GEOMETRY(POINT, 4326) NOT NULL,
   attributes JSONB DEFAULT '{}',
   version_id INTEGER DEFAULT 1,

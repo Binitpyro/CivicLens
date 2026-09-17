@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '../db';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4000/api';
@@ -8,6 +8,7 @@ export function useOfflineSync() {
   const [outboxCount, setOutboxCount] = useState<number>(0);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [coldStartNotice, setColdStartNotice] = useState<boolean>(false);
+  const lastSyncAttemptRef = useRef<number>(0);
 
   // Monitor network status
   useEffect(() => {
@@ -42,6 +43,8 @@ export function useOfflineSync() {
   // Sync outbox queue to server
   const triggerSync = useCallback(async () => {
     if (!navigator.onLine || isSyncing) return;
+    if (Date.now() - lastSyncAttemptRef.current < 15000) return;
+    lastSyncAttemptRef.current = Date.now();
 
     try {
       const outboxItems = await db.outbox.toArray();
