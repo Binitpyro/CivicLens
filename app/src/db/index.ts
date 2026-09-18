@@ -9,7 +9,7 @@ export interface LocalAsset {
   status: string;
   latitude: number;
   longitude: number;
-  attributes: Record<string, any>;
+  attributes: Record<string, unknown>;
   version_id: number;
   sync_state: 'saved' | 'syncing' | 'submitted';
 }
@@ -37,7 +37,7 @@ export interface OutboxItem {
   record_id: string;
   table_name: 'assets' | 'issues';
   action: 'create' | 'update' | 'delete';
-  payload: any;
+  payload: unknown;
   client_seq_num: number;
   created_at: string;
 }
@@ -132,7 +132,7 @@ export async function decryptPII(cipherText: string): Promise<string> {
       data
     );
     return new TextDecoder().decode(decrypted);
-  } catch (err) {
+  } catch {
     return cipherText;
   }
 }

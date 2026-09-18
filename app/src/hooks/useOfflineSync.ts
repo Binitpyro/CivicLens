@@ -34,10 +34,22 @@ export function useOfflineSync() {
   }, []);
 
   useEffect(() => {
-    refreshOutboxCount();
-    const interval = setInterval(refreshOutboxCount, 3000);
-    return () => clearInterval(interval);
-  }, [refreshOutboxCount]);
+    let isMounted = true;
+    db.outbox.count().then((count) => {
+      if (isMounted) setOutboxCount(count);
+    }).catch(() => {});
+
+    const interval = setInterval(() => {
+      db.outbox.count().then((count) => {
+        if (isMounted) setOutboxCount(count);
+      }).catch(() => {});
+    }, 3000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   // Sync outbox queue to server
   const triggerSync = useCallback(async () => {

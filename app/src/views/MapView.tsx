@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -13,6 +13,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import { db, type LocalAsset, type LocalIssue } from '../db';
 import { initializeLocalSeedData } from '../utils/seedLoader';
 import { spatialIndex } from '../utils/spatialIndex';
+import { preloadMapTiles, type PreloadProgress } from '../utils/tilePreloader';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { BottomSheet } from '../components/BottomSheet';
 import { IconPlus, IconGpsTarget } from '../components/CivicIcons';
@@ -45,6 +46,13 @@ function getCachedIcon(svgKey: string, pinClass: string): L.DivIcon {
   return icon;
 }
 
+interface RawGeoJSONFeature {
+  properties: Record<string, unknown>;
+  geometry: {
+    coordinates: [number, number];
+  };
+}
+
 interface MapViewProps {
   onReportIssueAtLocation?: (lat: number, lng: number) => void;
 }
@@ -55,11 +63,13 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const hasFittedBoundsRef = useRef<boolean>(false);
   const shouldCenterOnUserRef = useRef<boolean>(false);
+  const hasAutoCenteredRef = useRef<boolean>(false);
 
   const userMarkerRef = useRef<L.Marker | null>(null);
   const userAccuracyCircleRef = useRef<L.Circle | null>(null);
 
-  const { latitude: userLat, longitude: userLng, accuracy: userAccuracy, heading: userHeading, isLive, locateMe } = useGeolocation();
+  // Opt-in live geolocation watch for MapView only (prevents battery drain on other screens)
+  const { latitude: userLat, longitude: userLng, accuracy: userAccuracy, heading: userHeading, isLive, locateMe } = useGeolocation({ autoWatch: true });
 
   const [assets, setAssets] = useState<LocalAsset[]>([]);
   const [issues, setIssues] = useState<LocalIssue[]>([]);
@@ -67,6 +77,10 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
   const [selectedItem, setSelectedItem] = useState<{ title: string; type: string; details: string; status: string } | null>(null);
   const [currentCoords, setCurrentCoords] = useState<{ lat: number; lng: number }>({ lat: 28.6139, lng: 77.2090 });
   const [isDataLoading, setIsDataLoading] = useState(true);
+
+  // Offline Tile Preload State
+  const [isPreloadingTiles, setIsPreloadingTiles] = useState(false);
+  const [preloadProgress, setPreloadProgress] = useState<PreloadProgress | null>(null);
 
   const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4000/api';
 
@@ -105,17 +119,17 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
             if (assetRes.ok) {
               const assetData = await assetRes.json();
               if (assetData.features) {
-                const remoteAssets: LocalAsset[] = assetData.features.map((f: any) => ({
-                  id: f.properties.id,
-                  ward_id: f.properties.ward_id,
-                  asset_type: f.properties.asset_type,
-                  name: f.properties.name,
-                  lbd_asset_id: f.properties.lbd_asset_id,
-                  status: f.properties.status,
+                const remoteAssets: LocalAsset[] = assetData.features.map((f: RawGeoJSONFeature) => ({
+                  id: String(f.properties.id),
+                  ward_id: Number(f.properties.ward_id || 1),
+                  asset_type: String(f.properties.asset_type),
+                  name: String(f.properties.name || ''),
+                  lbd_asset_id: f.properties.lbd_asset_id ? String(f.properties.lbd_asset_id) : undefined,
+                  status: String(f.properties.status || 'active'),
                   latitude: f.geometry.coordinates[1],
                   longitude: f.geometry.coordinates[0],
-                  attributes: f.properties.attributes || {},
-                  version_id: f.properties.version_id || 1,
+                  attributes: (f.properties.attributes as Record<string, unknown>) || {},
+                  version_id: Number(f.properties.version_id || 1),
                   sync_state: 'submitted' as const,
                 }));
                 if (isMounted) {
@@ -128,19 +142,19 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
             if (issueRes.ok) {
               const issueData = await issueRes.json();
               if (issueData.features) {
-                const remoteIssues: LocalIssue[] = issueData.features.map((f: any) => ({
-                  id: f.properties.id,
-                  ward_id: f.properties.ward_id,
-                  category: f.properties.category,
-                  severity: f.properties.severity,
-                  description: f.properties.description,
-                  photo_url: f.properties.photo_url,
-                  status: f.properties.status,
+                const remoteIssues: LocalIssue[] = issueData.features.map((f: RawGeoJSONFeature) => ({
+                  id: String(f.properties.id),
+                  ward_id: Number(f.properties.ward_id || 1),
+                  category: String(f.properties.category),
+                  severity: String(f.properties.severity || 'medium'),
+                  description: String(f.properties.description || ''),
+                  photo_url: f.properties.photo_url ? String(f.properties.photo_url) : undefined,
+                  status: String(f.properties.status || 'open'),
                   latitude: f.geometry.coordinates[1],
                   longitude: f.geometry.coordinates[0],
-                  version_id: f.properties.version_id || 1,
-                  client_seq_num: f.properties.client_seq_num || Date.now(),
-                  date_reported: f.properties.date_reported || new Date().toISOString(),
+                  version_id: Number(f.properties.version_id || 1),
+                  client_seq_num: Number(f.properties.client_seq_num || Date.now()),
+                  date_reported: String(f.properties.date_reported || new Date().toISOString()),
                   sync_state: 'submitted' as const,
                 }));
                 if (isMounted) {
@@ -165,6 +179,72 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
     };
   }, [API_BASE]);
 
+  // Fetch backend Bounding Box features on moveend when online
+  const fetchViewportBboxData = useCallback(async () => {
+    const map = leafletMap.current;
+    if (!map || !navigator.onLine) return;
+
+    const bounds = map.getBounds();
+    const params = new URLSearchParams({
+      minLng: bounds.getWest().toFixed(5),
+      minLat: bounds.getSouth().toFixed(5),
+      maxLng: bounds.getEast().toFixed(5),
+      maxLat: bounds.getNorth().toFixed(5),
+    });
+
+    try {
+      const [assetRes, issueRes] = await Promise.all([
+        fetch(`${API_BASE}/assets?${params}`),
+        fetch(`${API_BASE}/issues?${params}`),
+      ]);
+
+      if (assetRes.ok) {
+        const data = await assetRes.json();
+        if (data.features) {
+          const fetched: LocalAsset[] = data.features.map((f: any) => ({
+            id: f.properties.id,
+            ward_id: f.properties.ward_id,
+            asset_type: f.properties.asset_type,
+            name: f.properties.name,
+            status: f.properties.status,
+            latitude: f.geometry.coordinates[1],
+            longitude: f.geometry.coordinates[0],
+            attributes: f.properties.attributes || {},
+            version_id: f.properties.version_id || 1,
+            sync_state: 'submitted' as const,
+          }));
+          spatialIndex.setAssets(fetched);
+          setAssets(fetched);
+        }
+      }
+
+      if (issueRes.ok) {
+        const data = await issueRes.json();
+        if (data.features) {
+          const fetched: LocalIssue[] = data.features.map((f: any) => ({
+            id: f.properties.id,
+            ward_id: f.properties.ward_id,
+            category: f.properties.category,
+            severity: f.properties.severity,
+            description: f.properties.description,
+            photo_url: f.properties.photo_url,
+            status: f.properties.status,
+            latitude: f.geometry.coordinates[1],
+            longitude: f.geometry.coordinates[0],
+            version_id: f.properties.version_id || 1,
+            client_seq_num: f.properties.client_seq_num || Date.now(),
+            date_reported: f.properties.date_reported || new Date().toISOString(),
+            sync_state: 'submitted' as const,
+          }));
+          spatialIndex.setIssues(fetched);
+          setIssues(fetched);
+        }
+      }
+    } catch {
+      // Safe fallback
+    }
+  }, [API_BASE]);
+
   // 2. Initialize Leaflet Map with Canvas renderer & High-Performance Cluster Group
   useEffect(() => {
     if (!mapRef.current || leafletMap.current) return;
@@ -186,7 +266,8 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
       attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map);
 
-    const clusterGroup = (L as any).markerClusterGroup({
+    const markerClusterFactory = L as unknown as { markerClusterGroup: (opts: object) => L.LayerGroup };
+    const clusterGroup = markerClusterFactory.markerClusterGroup({
       showCoverageOnHover: false,
       maxClusterRadius: 40,
       spiderfyOnMaxZoom: true,
@@ -201,12 +282,13 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
     leafletMap.current = map;
 
     let moveTimer: ReturnType<typeof setTimeout> | null = null;
-    map.on('move', () => {
+    map.on('moveend', () => {
       if (moveTimer) clearTimeout(moveTimer);
       moveTimer = setTimeout(() => {
         const center = map.getCenter();
         setCurrentCoords({ lat: center.lat, lng: center.lng });
-      }, 80);
+        fetchViewportBboxData();
+      }, 150);
     });
 
     const timer1 = setTimeout(() => {
@@ -233,13 +315,26 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
       clearTimeout(timer1);
       clearTimeout(timer2);
       window.removeEventListener('resize', handleResize);
+
+      // Clean up Leaflet markers & layers to prevent memory leaks
+      if (userMarkerRef.current) {
+        userMarkerRef.current.remove();
+        userMarkerRef.current = null;
+      }
+      if (userAccuracyCircleRef.current) {
+        userAccuracyCircleRef.current.remove();
+        userAccuracyCircleRef.current = null;
+      }
+      if (markersLayerRef.current) {
+        markersLayerRef.current.clearLayers();
+        markersLayerRef.current = null;
+      }
       map.remove();
       leafletMap.current = null;
-      markersLayerRef.current = null;
     };
-  }, []);
+  }, [fetchViewportBboxData]);
 
-  // 3. Render Markers into Leaflet cluster group
+  // 3. Render Markers using RBush Spatial Index Range Query for Viewport Culling
   useEffect(() => {
     const map = leafletMap.current;
     const markersLayer = markersLayerRef.current;
@@ -248,8 +343,24 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
     markersLayer.clearLayers();
     const addedMarkers: L.Marker[] = [];
 
+    // Perform O(log N) RBush spatial index search for current viewport bounds
+    const bounds = map.getBounds();
+    const bbox = {
+      minLng: bounds.getWest(),
+      minLat: bounds.getSouth(),
+      maxLng: bounds.getEast(),
+      maxLat: bounds.getNorth(),
+    };
+
+    const visibleAssets = spatialIndex.searchAssets(bbox);
+    const visibleIssues = spatialIndex.searchIssues(bbox);
+
+    // Fallback to full list if viewport index is empty initially
+    const assetsToRender = visibleAssets.length > 0 ? visibleAssets : assets;
+    const issuesToRender = visibleIssues.length > 0 ? visibleIssues : issues;
+
     // Render Village Assets
-    assets.forEach((asset) => {
+    assetsToRender.forEach((asset) => {
       if (activeFilter !== 'all' && activeFilter !== 'assets') return;
       const svgKey = asset.asset_type === 'handpump' ? 'water' : asset.asset_type === 'school' ? 'education' : asset.asset_type === 'streetlight' ? 'lighting' : 'building';
       const pinClass = asset.asset_type === 'handpump' ? 'pin-water' : asset.asset_type === 'school' ? 'pin-education' : asset.asset_type === 'streetlight' ? 'pin-lighting' : 'pin-sanitation';
@@ -270,7 +381,7 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
     });
 
     // Render Issues / Grievances
-    issues.forEach((issue) => {
+    issuesToRender.forEach((issue) => {
       if (activeFilter !== 'all' && activeFilter !== 'issues') return;
 
       const marker = L.marker([issue.latitude, issue.longitude], {
@@ -290,8 +401,9 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
 
     // High performance bulk add in a single spatial pass
     if (addedMarkers.length > 0) {
-      if (typeof (markersLayer as any).addLayers === 'function') {
-        (markersLayer as any).addLayers(addedMarkers);
+      const clusterWithBulk = markersLayer as unknown as { addLayers?: (markers: L.Marker[]) => void };
+      if (typeof clusterWithBulk.addLayers === 'function') {
+        clusterWithBulk.addLayers(addedMarkers);
       } else {
         addedMarkers.forEach((m) => markersLayer.addLayer(m));
       }
@@ -308,8 +420,6 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
       }
     }
   }, [assets, issues, activeFilter]);
-
-  const hasAutoCenteredRef = useRef<boolean>(false);
 
   // 4. Google Maps Authentic Live Blue Dot & Accuracy Ring
   useEffect(() => {
@@ -388,6 +498,37 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
     }
   };
 
+  // Preload Map Tiles for Ward Offline Usage
+  const handlePreloadTiles = async () => {
+    if (isPreloadingTiles) return;
+    const map = leafletMap.current;
+    if (!map) return;
+
+    setIsPreloadingTiles(true);
+    setPreloadProgress({ total: 0, completed: 0, failed: 0, percent: 0 });
+
+    const bounds = map.getBounds();
+    const wardBounds = {
+      minLat: bounds.getSouth(),
+      minLng: bounds.getWest(),
+      maxLat: bounds.getNorth(),
+      maxLng: bounds.getEast(),
+    };
+
+    try {
+      await preloadMapTiles(wardBounds, 13, 16, (prog) => {
+        setPreloadProgress(prog);
+      });
+    } catch (err) {
+      console.error('Failed to preload map tiles:', err);
+    } finally {
+      setTimeout(() => {
+        setIsPreloadingTiles(false);
+        setPreloadProgress(null);
+      }, 1500);
+    }
+  };
+
   return (
     <div className="map-view-container" role="region" aria-label="GIS Interactive Map">
       {/* Floating GPS Target Button */}
@@ -416,6 +557,16 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
             GPS {userAccuracy !== null && userAccuracy !== undefined ? `±${userAccuracy}m` : 'EXACT'}
           </span>
           <span className="tabular-nums">{currentCoords.lat.toFixed(6)}°N, {currentCoords.lng.toFixed(6)}°E</span>
+
+          <button
+            type="button"
+            className="filter-chip active"
+            onClick={handlePreloadTiles}
+            disabled={isPreloadingTiles}
+            style={{ marginLeft: 'auto', fontSize: '10px', padding: '2px 8px' }}
+          >
+            {isPreloadingTiles ? `Caching ${preloadProgress?.percent || 0}%` : '📥 Offline Map'}
+          </button>
         </div>
 
         <div className="map-filter-chips" role="toolbar" aria-label="Map filters">

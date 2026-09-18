@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { db } from '../db';
 import { useOfflineSync } from '../hooks/useOfflineSync';
+import { getAssetTypeIcon } from '../utils/iconHelpers';
 import {
-  getAssetTypeIcon,
   IconCrosshair,
   IconCheck
 } from '../components/CivicIcons';

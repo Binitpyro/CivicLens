@@ -4,8 +4,8 @@ import { useGeolocation } from '../hooks/useGeolocation';
 import { compressPhotoOffThread } from '../services/photoWorker';
 import { db, encryptPII } from '../db';
 import { useOfflineSync } from '../hooks/useOfflineSync';
+import { getCategoryIcon } from '../utils/iconHelpers';
 import {
-  getCategoryIcon,
   IconCamera,
   IconCrosshair,
   IconCheck,

@@ -207,43 +207,7 @@ export const IconCivicLensLogo: React.FC<IconProps> = ({ size = 24, color = 'cur
   </svg>
 );
 
-export function getCategoryIcon(categoryId: string, size = 20) {
-  switch (categoryId) {
-    case 'Water Supply':
-      return <IconWaterTap size={size} />;
-    case 'Street Lighting':
-      return <IconStreetlight size={size} />;
-    case 'Public Sanitation':
-      return <IconToilet size={size} />;
-    case 'Roads & Drains':
-      return <IconRoad size={size} />;
-    case 'Health (PHC)':
-      return <IconHealth size={size} />;
-    case 'School / Anganwadi':
-      return <IconSchool size={size} />;
-    default:
-      return <IconBuilding size={size} />;
-  }
-}
-
-export function getAssetTypeIcon(assetType: string, size = 20) {
-  switch (assetType) {
-    case 'handpump':
-      return <IconWaterTap size={size} />;
-    case 'streetlight':
-      return <IconStreetlight size={size} />;
-    case 'public_toilet':
-      return <IconToilet size={size} />;
-    case 'drainage':
-      return <IconRoad size={size} />;
-    case 'anganwadi':
-      return <IconBuilding size={size} />;
-    case 'school':
-      return <IconSchool size={size} />;
-    default:
-      return <IconBuilding size={size} />;
-  }
-}export const IconGpsTarget: React.FC<IconProps> = ({ size = 20, color = 'currentColor', strokeWidth = 2, ...props }) => (
+export const IconGpsTarget: React.FC<IconProps> = ({ size = 20, color = 'currentColor', strokeWidth = 2, ...props }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" {...props}>
     <circle cx="12" cy="12" r="8" />
     <line x1="12" y1="2" x2="12" y2="6" />

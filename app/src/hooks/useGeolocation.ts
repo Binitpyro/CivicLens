@@ -13,7 +13,13 @@ export interface LocationState {
   timestamp: number | null;
 }
 
-export function useGeolocation() {
+export interface UseGeolocationOptions {
+  autoWatch?: boolean;
+}
+
+export function useGeolocation(options: UseGeolocationOptions = {}) {
+  const { autoWatch = false } = options;
+
   const [location, setLocation] = useState<LocationState>({
     latitude: 28.6139,
     longitude: 77.2090,
@@ -28,8 +34,10 @@ export function useGeolocation() {
   });
 
   const watchIdRef = useRef<number | null>(null);
+  const lastHeadingRef = useRef<number | null>(null);
+  const lastHeadingTimeRef = useRef<number>(0);
 
-  // High precision single fix with maximumAge: 0 (zero cached position delay)
+  // Single on-demand GPS fix (zero battery drain when idle)
   const locateMe = useCallback(() => {
     if (!navigator.geolocation) {
       setLocation((prev) => ({ ...prev, error: 'Geolocation is not supported by your browser' }));
@@ -45,7 +53,7 @@ export function useGeolocation() {
           latitude,
           longitude,
           accuracy: Number.isFinite(accuracy) ? accuracy : null,
-          heading: heading ?? null,
+          heading: heading ?? lastHeadingRef.current,
           speed: speed ?? null,
           altitude: altitude ?? null,
           loading: false,
@@ -55,48 +63,49 @@ export function useGeolocation() {
         });
       },
       (error) => {
-        console.warn('High precision GPS warning:', error.message);
+        console.warn('GPS position fix warning:', error.message);
         setLocation((prev) => ({
           ...prev,
           loading: false,
-          error: 'Unable to fetch high precision GPS position.',
+          error: 'Unable to fetch GPS position fix.',
         }));
       },
       {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 0, // Force fresh hardware fix
+        maximumAge: 5000,
       }
     );
   }, []);
 
-  // Continuous high precision position watcher
+  // Continuous position watcher (opt-in)
   const startLiveWatch = useCallback(() => {
     if (!navigator.geolocation || watchIdRef.current !== null) return;
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude, accuracy, heading, speed, altitude } = position.coords;
-        setLocation({
+        setLocation((prev) => ({
+          ...prev,
           latitude,
           longitude,
           accuracy: Number.isFinite(accuracy) ? accuracy : null,
-          heading: heading ?? null,
+          heading: heading ?? prev.heading ?? lastHeadingRef.current,
           speed: speed ?? null,
           altitude: altitude ?? null,
           loading: false,
           error: null,
           isLive: true,
           timestamp: position.timestamp || Date.now(),
-        });
+        }));
       },
       (error) => {
-        console.warn('Live high-precision location watch warning:', error.message);
+        console.warn('Live location watch warning:', error.message);
       },
       {
         enableHighAccuracy: true,
         timeout: 15000,
-        maximumAge: 0, // Fresh hardware GPS fixes
+        maximumAge: 3000,
       }
     );
   }, []);
@@ -108,15 +117,25 @@ export function useGeolocation() {
     }
   }, []);
 
-  // Device Orientation listener for compass heading beam
+  // Throttled Device Orientation listener (max 300ms, >5 deg delta) to prevent 60Hz re-render storm
   useEffect(() => {
     const handleOrientation = (event: DeviceOrientationEvent) => {
-      if (event.alpha !== null && event.alpha !== undefined) {
-        // webkitCompassHeading for iOS, alpha for Android
-        const compassHeading = (event as any).webkitCompassHeading ?? (360 - event.alpha);
-        if (!isNaN(compassHeading)) {
-          setLocation((prev) => ({ ...prev, heading: Math.round(compassHeading) }));
-        }
+      if (event.alpha === null || event.alpha === undefined) return;
+
+      const now = Date.now();
+      if (now - lastHeadingTimeRef.current < 300) return; // Throttle to max 3 updates/sec
+
+      const rawHeading = (event as any).webkitCompassHeading ?? (360 - event.alpha);
+      if (isNaN(rawHeading)) return;
+
+      const rounded = Math.round(rawHeading);
+      const prev = lastHeadingRef.current;
+
+      // Only update state if heading shifted by at least 5 degrees
+      if (prev === null || Math.abs(rounded - prev) >= 5) {
+        lastHeadingRef.current = rounded;
+        lastHeadingTimeRef.current = now;
+        setLocation((p) => (p.heading === rounded ? p : { ...p, heading: rounded }));
       }
     };
 
@@ -130,16 +149,21 @@ export function useGeolocation() {
     };
   }, []);
 
+  // Start live position watch ONLY if autoWatch is explicitly requested
   useEffect(() => {
-    startLiveWatch();
+    if (autoWatch) {
+      startLiveWatch();
+    }
     return () => {
       stopLiveWatch();
     };
-  }, [startLiveWatch, stopLiveWatch]);
+  }, [autoWatch, startLiveWatch, stopLiveWatch]);
 
   return {
     ...location,
     locateMe,
     getSingleFix: locateMe,
+    startLiveWatch,
+    stopLiveWatch,
   };
 }

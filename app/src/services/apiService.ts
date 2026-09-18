@@ -33,7 +33,7 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
       try {
         const errorData = await response.json();
         errorMessage = errorData.error || errorMessage;
-      } catch (e) {
+      } catch {
         // ignore
       }
       throw new Error(errorMessage);
