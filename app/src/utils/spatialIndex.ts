@@ -51,7 +51,7 @@ export class SpatialIndexManager {
       maxX: bbox.maxLng,
       maxY: bbox.maxLat,
     });
-    return results.map((item) => item.data);
+    return results.map((item: BBoxItem<LocalAsset>) => item.data);
   }
 
   public searchIssues(bbox: BoundingBox): LocalIssue[] {
@@ -61,7 +61,7 @@ export class SpatialIndexManager {
       maxX: bbox.maxLng,
       maxY: bbox.maxLat,
     });
-    return results.map((item) => item.data);
+    return results.map((item: BBoxItem<LocalIssue>) => item.data);
   }
 }
 

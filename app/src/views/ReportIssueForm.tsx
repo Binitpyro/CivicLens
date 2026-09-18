@@ -223,7 +223,7 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
           <button
             type="button"
             className="filter-chip"
-            onClick={getSingleFix}
+            onClick={locateMe}
             disabled={geoLoading}
             aria-label="Refresh GPS coordinates"
           >

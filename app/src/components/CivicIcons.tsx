@@ -217,3 +217,6 @@ export const IconGpsTarget: React.FC<IconProps> = ({ size = 20, color = 'current
     <circle cx="12" cy="12" r="2" fill={color} />
   </svg>
 );
+
+export { getCategoryIcon, getAssetTypeIcon } from '../utils/iconHelpers';
+

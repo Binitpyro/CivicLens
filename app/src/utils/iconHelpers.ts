@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   IconWaterTap,
   IconStreetlight,
@@ -8,40 +9,42 @@ import {
   IconBuilding,
 } from '../components/CivicIcons';
 
-export function getCategoryIcon(category: string, size = 20) {
+export function getCategoryIcon(category: string, size = 20): React.ReactElement {
   switch (category) {
     case 'Water Supply':
-      return IconWaterTap({ size });
+      return React.createElement(IconWaterTap, { size });
     case 'Street Lighting':
-      return IconStreetlight({ size });
+      return React.createElement(IconStreetlight, { size });
     case 'Public Sanitation':
-      return IconToilet({ size });
+      return React.createElement(IconToilet, { size });
     case 'Roads & Drains':
-      return IconRoad({ size });
+      return React.createElement(IconRoad, { size });
     case 'Health (PHC)':
-      return IconHealth({ size });
+      return React.createElement(IconHealth, { size });
     case 'School / Anganwadi':
-      return IconSchool({ size });
+      return React.createElement(IconSchool, { size });
     default:
-      return IconBuilding({ size });
+      return React.createElement(IconBuilding, { size });
   }
 }
 
-export function getAssetTypeIcon(assetType: string, size = 20) {
+export function getAssetTypeIcon(assetType: string, size = 20): React.ReactElement {
   switch (assetType) {
     case 'handpump':
-      return IconWaterTap({ size });
+      return React.createElement(IconWaterTap, { size });
     case 'streetlight':
-      return IconStreetlight({ size });
+      return React.createElement(IconStreetlight, { size });
     case 'public_toilet':
-      return IconToilet({ size });
+      return React.createElement(IconToilet, { size });
     case 'drainage':
-      return IconRoad({ size });
+      return React.createElement(IconRoad, { size });
     case 'anganwadi':
-      return IconBuilding({ size });
+      return React.createElement(IconBuilding, { size });
     case 'school':
-      return IconSchool({ size });
+      return React.createElement(IconSchool, { size });
     default:
-      return IconBuilding({ size });
+      return React.createElement(IconBuilding, { size });
   }
 }
+
+
