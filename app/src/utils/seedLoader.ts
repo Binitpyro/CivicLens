@@ -8,7 +8,7 @@ export async function initializeLocalSeedData(): Promise<void> {
       const seedData = seedModule.default || seedModule;
       await db.assets.bulkPut(seedData.assets as LocalAsset[]);
       await db.issues.bulkPut(seedData.issues as LocalIssue[]);
-      console.log('IndexedDB initialized with 20 geotagged assets & 6 issues for Ward 3.');
+      console.log('IndexedDB initialized with pilot ward seed data.');
     }
   } catch (err) {
     console.error('Error initializing local seed data:', err);

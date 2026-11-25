@@ -5,6 +5,7 @@ import { Header } from './components/Header';
 import { BottomNav, type TabType } from './components/BottomNav';
 import { StoragePersistModal } from './components/StoragePersistModal';
 import type { UserProfile } from './services/apiService';
+import { WardProvider } from './context/WardContext';
 
 // Code-split heavy view components for fast initial load
 const MapView = lazy(() => import('./views/MapView').then(m => ({ default: m.MapView })));
@@ -64,10 +65,11 @@ export function App() {
   };
 
   return (
-    <div className="app-mobile-shell">
-      <StoragePersistModal />
+    <WardProvider wardId={user.ward_id || 1} wardName={user.ward_name} villageName={user.village_name}>
+      <div className="app-mobile-shell">
+        <StoragePersistModal />
 
-      <Header onLogout={handleLogout} />
+        <Header onLogout={handleLogout} />
 
       <main className="main-content-viewport">
         <Suspense fallback={<ViewLoadingFallback />}>
@@ -102,11 +104,12 @@ export function App() {
         </Suspense>
       </main>
 
-      <BottomNav
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-      />
-    </div>
+        <BottomNav
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+        />
+      </div>
+    </WardProvider>
   );
 }
 

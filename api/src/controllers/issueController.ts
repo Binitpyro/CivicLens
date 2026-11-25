@@ -14,7 +14,6 @@ export async function getIssuesGeoJSON(req: Request, res: Response) {
         severity, 
         description,
         photo_url,
-        encrypted_phone,
         status, 
         reported_by,
         assigned_officer,
@@ -68,7 +67,7 @@ export async function getIssuesGeoJSON(req: Request, res: Response) {
         severity: row.severity,
         description: row.description,
         photo_url: row.photo_url,
-        encrypted_phone: row.encrypted_phone,
+        // encrypted_phone intentionally excluded — never returned to unauthenticated callers
         status: row.status,
         reported_by: row.reported_by,
         assigned_officer: row.assigned_officer,
@@ -115,7 +114,7 @@ export async function createIssue(req: AuthRequest, res: Response) {
          version_id = issues.version_id + 1,
          updated_at = now()
        RETURNING id, category, severity, status, version_id, server_received_at`,
-      [id, asset_id || null, ward_id || 1, category, severity || 'medium', description || '', photo_url || null, encrypted_phone || null, longitude, latitude, userId, seqNum]
+      [id, asset_id || null, req.user?.ward_id || ward_id || 1, category, severity || 'medium', description || '', photo_url || null, encrypted_phone || null, longitude, latitude, userId, seqNum]
     );
 
     return res.status(201).json(result.rows[0]);
@@ -134,13 +133,11 @@ export async function updateIssueStatus(req: AuthRequest, res: Response) {
       return res.status(400).json({ error: 'Valid status is required (open, in_progress, resolved)' });
     }
 
-    const resolvedDate = status === 'resolved' ? 'now()' : 'NULL';
-
     const result = await pool.query(
       `UPDATE issues 
        SET status = $1,
            assigned_officer = COALESCE($2, assigned_officer),
-           date_resolved = ${resolvedDate},
+           date_resolved = CASE WHEN $1 = 'resolved' THEN now() ELSE NULL END,
            version_id = version_id + 1,
            updated_at = now()
        WHERE id = $3

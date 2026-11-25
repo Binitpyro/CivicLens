@@ -2,11 +2,7 @@ import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { pool } from '../config/db';
-
-if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
-  console.warn('CRITICAL SECURITY WARNING: JWT_SECRET environment variable is missing in production!');
-}
-const JWT_SECRET = process.env.JWT_SECRET || 'civiclens-super-secret-key-2026';
+import { JWT_SECRET } from '../middleware/auth';
 
 export async function login(req: Request, res: Response) {
   try {
@@ -15,7 +11,14 @@ export async function login(req: Request, res: Response) {
       return res.status(400).json({ error: 'Phone and password are required' });
     }
 
-    const result = await pool.query('SELECT * FROM users WHERE phone = $1', [phone]);
+    const result = await pool.query(
+      `SELECT u.*, w.name AS ward_name, v.name AS village_name
+       FROM users u
+       LEFT JOIN wards w ON w.id = u.ward_id
+       LEFT JOIN villages v ON v.id = w.village_id
+       WHERE u.phone = $1`,
+      [phone],
+    );
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid phone or password' });
     }
@@ -39,7 +42,9 @@ export async function login(req: Request, res: Response) {
         name: user.name,
         phone: user.phone,
         role: user.role,
-        ward_id: user.ward_id
+        ward_id: user.ward_id,
+        ward_name: user.ward_name,
+        village_name: user.village_name,
       }
     });
   } catch (error) {
@@ -60,11 +65,18 @@ export async function register(req: Request, res: Response) {
     const assignedRole = 'viewer';
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const wardId = ward_id || 1;
     const result = await pool.query(
-      `INSERT INTO users (name, phone, password_hash, role, ward_id)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, name, phone, role, ward_id`,
-      [name, phone, passwordHash, assignedRole, ward_id || 1]
+      `WITH inserted AS (
+         INSERT INTO users (name, phone, password_hash, role, ward_id)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, name, phone, role, ward_id
+       )
+       SELECT i.*, w.name AS ward_name, v.name AS village_name
+       FROM inserted i
+       LEFT JOIN wards w ON w.id = i.ward_id
+       LEFT JOIN villages v ON v.id = w.village_id`,
+      [name, phone, passwordHash, assignedRole, wardId]
     );
 
     const newUser = result.rows[0];

@@ -660,9 +660,203 @@ h1, h2, h3, .view-heading {
   font-size: var(--text-sm);
 }
 
+.sheet-coords-badge {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  background: rgba(2, 132, 199, 0.1);
+  color: #0284C7;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+  border: 1px solid rgba(2, 132, 199, 0.2);
+}
+
 /* ==========================================================================
-   Form & card system
+   Map Interactive Cursor, Popups & Tooltips
    ========================================================================== */
+.leaflet-popup.custom-map-popup .leaflet-popup-content-wrapper {
+  background: var(--color-surface, #FFFFFF);
+  color: var(--color-ink, #0F172A);
+  border-radius: 14px;
+  padding: 0;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--color-rule, rgba(0, 0, 0, 0.08));
+  overflow: hidden;
+}
+
+.leaflet-popup.custom-map-popup .leaflet-popup-content {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.leaflet-popup.custom-map-popup .leaflet-popup-tip {
+  background: var(--color-surface, #FFFFFF);
+}
+
+.map-click-popup {
+  padding: 14px 16px;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.map-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.map-popup-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--color-ink, #0F172A);
+}
+
+.map-popup-coords {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  color: #0284C7;
+  background: rgba(2, 132, 199, 0.08);
+  padding: 3px 8px;
+  border-radius: 6px;
+  display: inline-block;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.map-popup-meta {
+  font-size: 11px;
+  color: var(--color-ink-muted, #64748B);
+}
+
+.map-popup-btn {
+  margin-top: 8px;
+  background: var(--color-status-urgent, #E11D48);
+  color: #FFFFFF;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: transform 0.15s ease, background 0.15s ease;
+  width: 100%;
+}
+
+.map-popup-btn:hover {
+  background: #BE123C;
+  transform: translateY(-1px);
+}
+
+.map-popup-btn:active {
+  transform: translateY(0);
+}
+
+/* Custom Marker Hover Tooltips */
+.leaflet-tooltip.custom-marker-tooltip {
+  background: rgba(15, 23, 42, 0.94);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 8px 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.leaflet-tooltip.custom-marker-tooltip::before {
+  border-top-color: rgba(15, 23, 42, 0.94);
+}
+
+.custom-marker-tooltip .tooltip-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.custom-marker-tooltip .asset-badge {
+  background: #0284C7;
+  color: #FFFFFF;
+}
+
+.custom-marker-tooltip .issue-badge {
+  background: #E11D48;
+  color: #FFFFFF;
+}
+
+.custom-marker-tooltip .tooltip-title {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+.custom-marker-tooltip .tooltip-coords {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: #94A3B8;
+  margin-top: 2px;
+}
+
+.custom-marker-tooltip .tooltip-action-prompt {
+  font-size: 10px;
+  color: #38BDF8;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+/* Dropped Pin Pin Animation */
+.map-target-pin-wrap {
+  background: none;
+  border: none;
+}
+
+.map-dropped-pin {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.map-dropped-pin-ring {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #E11D48;
+  background: rgba(225, 29, 72, 0.2);
+  animation: droppedPinPulse 1.8s infinite ease-out;
+}
+
+.map-dropped-pin-icon {
+  font-size: 22px;
+  position: relative;
+  z-index: 2;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+@keyframes droppedPinPulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
 .report-form-container, .reports-timeline-container, .admin-dashboard-container {
   padding: var(--space-md);
   max-width: 600px;

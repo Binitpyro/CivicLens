@@ -5,7 +5,8 @@ import type { AuthRequest } from '../middleware/auth';
 export async function getAssetsGeoJSON(req: Request, res: Response) {
   try {
     const { type, ward_id, minLng, minLat, maxLng, maxLat, simplifyTolerance } = req.query;
-    const tol = simplifyTolerance ? parseFloat(simplifyTolerance as string) : 0;
+    const parsedTol = simplifyTolerance ? parseFloat(simplifyTolerance as string) : 0;
+    const tol = (!isNaN(parsedTol) && isFinite(parsedTol) && parsedTol > 0 && parsedTol <= 0.05) ? parsedTol : 0;
     const geomExpr = tol > 0 ? `ST_SimplifyPreserveTopology(location, ${tol})` : 'location';
 
     let query = `
@@ -90,7 +91,7 @@ export async function createAsset(req: AuthRequest, res: Response) {
          version_id = assets.version_id + 1,
          updated_at = now()
        RETURNING id, asset_type, status, version_id`,
-      [id, ward_id || 1, asset_type, name, lbd_asset_id, status || 'active', longitude, latitude, JSON.stringify(attributes || {})]
+      [id, req.user?.ward_id || ward_id || 1, asset_type, name, lbd_asset_id, status || 'active', longitude, latitude, JSON.stringify(attributes || {})]
     );
 
     return res.status(201).json(result.rows[0]);
@@ -98,4 +99,72 @@ export async function createAsset(req: AuthRequest, res: Response) {
     console.error('Error creating asset:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
+}
+
+/**
+ * POST /api/assets/bulk
+ * Upserts an array of asset payloads in a single DB transaction.
+ * Returns { inserted, updated, failed, errors[] } summary.
+ */
+export async function bulkUpsertAssets(req: AuthRequest, res: Response) {
+  const { assets } = req.body;
+
+  if (!Array.isArray(assets) || assets.length === 0) {
+    return res.status(400).json({ error: '`assets` must be a non-empty array' });
+  }
+  if (assets.length > 500) {
+    return res.status(400).json({ error: 'Bulk limit is 500 assets per request' });
+  }
+
+  let inserted = 0;
+  let updated  = 0;
+  const errors: Array<{ id: string; error: string }> = [];
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    for (const asset of assets) {
+      const { id, ward_id, asset_type, name, lbd_asset_id, status, latitude, longitude, attributes } = asset;
+
+      if (!id || !asset_type || latitude === undefined || longitude === undefined) {
+        errors.push({ id: id || '?', error: 'Missing required fields: id, asset_type, latitude, longitude' });
+        continue;
+      }
+
+      const existing = await client.query('SELECT id FROM assets WHERE id = $1', [id]);
+      const isNew = existing.rows.length === 0;
+
+      await client.query(
+        `INSERT INTO assets (id, ward_id, asset_type, name, lbd_asset_id, status, location, attributes)
+         VALUES ($1, $2, $3, $4, $5, $6, ST_SetSRID(ST_MakePoint($7, $8), 4326), $9)
+         ON CONFLICT (id) DO UPDATE SET
+           name       = EXCLUDED.name,
+           status     = EXCLUDED.status,
+           attributes = EXCLUDED.attributes,
+           version_id = assets.version_id + 1,
+           updated_at = now()`,
+        [id, req.user?.ward_id || ward_id || 1, asset_type, name || null, lbd_asset_id || null,
+         status || 'active', longitude, latitude, JSON.stringify(attributes || {})]
+      );
+
+      if (isNew) inserted++; else updated++;
+    }
+
+    await client.query('COMMIT');
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Bulk asset upsert transaction failed:', err);
+    return res.status(500).json({ error: 'Bulk upsert failed — transaction rolled back', detail: err.message });
+  } finally {
+    client.release();
+  }
+
+  return res.status(200).json({
+    inserted,
+    updated,
+    failed: errors.length,
+    errors,
+    total_received: assets.length,
+  });
 }

@@ -2,8 +2,10 @@ export interface UserProfile {
   id: number;
   name: string;
   phone: string;
-  role: 'citizen' | 'volunteer' | 'admin';
+  role: 'citizen' | 'volunteer' | 'admin' | 'surveyor' | 'viewer' | 'panchayat_officer';
   ward_id?: number;
+  ward_name?: string;
+  village_name?: string;
 }
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 

@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { db, type LocalAsset, type LocalIssue } from '../db';
 import { IconPrinter } from '../components/CivicIcons';
+import { useWard } from '../context/WardContext';
 
 interface ReportPrintViewProps {
   onBack: () => void;
 }
 
 export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
+  const { wardId, wardLabel } = useWard();
   const [assets, setAssets] = useState<LocalAsset[]>([]);
   const [issues, setIssues] = useState<LocalIssue[]>([]);
   const [coverageGaps, setCoverageGaps] = useState<any[]>([]);
@@ -17,14 +19,14 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
   useEffect(() => {
     async function loadReportData() {
       try {
-        const localAssets = await db.assets.toArray();
-        const localIssues = await db.issues.toArray();
+        const localAssets = (await db.assets.toArray()).filter((asset) => asset.ward_id === wardId);
+        const localIssues = (await db.issues.toArray()).filter((issue) => issue.ward_id === wardId);
         setAssets(localAssets);
         setIssues(localIssues);
 
         if (navigator.onLine) {
           try {
-            const gapRes = await fetch(`${API_BASE}/analytics/coverage-gaps`);
+            const gapRes = await fetch(`${API_BASE}/analytics/coverage-gaps?ward_id=${wardId}&distance_m=500`);
             if (gapRes.ok) {
               const gapData = await gapRes.json();
               if (gapData.features) {
@@ -42,7 +44,7 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
       }
     }
     loadReportData();
-  }, [API_BASE]);
+  }, [API_BASE, wardId]);
 
   const handlePrint = () => {
     window.print();
@@ -82,7 +84,7 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
       <div className="printable-document">
         <div className="doc-header">
           <h1>GRAM PANCHAYAT INFRASTRUCTURE & GRIEVANCE REPORT</h1>
-          <h2>Gram Panchayat Monitoring Report — Ward 3 (Kalyanpur)</h2>
+          <h2>Gram Panchayat Monitoring Report — {wardLabel}</h2>
           <p className="doc-meta">
             Generated Date: {new Date().toLocaleDateString()} | System: CivicLens GIS Platform
           </p>
@@ -166,7 +168,7 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
             </div>
           ) : (
             <p className="doc-note" style={{ color: '#334155' }}>
-              <strong>Target Action Required:</strong> Schools and health facilities in Ward 3 currently have functional drinking water access within 500m buffer zone.
+              <strong>Target Action Required:</strong> Schools and health facilities in {wardLabel} currently have functional drinking water access within 500m buffer zone.
             </p>
           )}
         </section>

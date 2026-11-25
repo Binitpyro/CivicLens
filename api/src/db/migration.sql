@@ -30,9 +30,9 @@ CREATE TABLE IF NOT EXISTS wards (
     boundary GEOMETRY(POLYGON, 4326)
 );
 
--- Geotagged infrastructure assets
+-- Geotagged infrastructure assets (supports prefixed and UUID string IDs)
 CREATE TABLE IF NOT EXISTS assets (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id VARCHAR(64) PRIMARY KEY,
     ward_id INTEGER REFERENCES wards(id) ON DELETE SET NULL,
     asset_type TEXT NOT NULL CHECK (asset_type IN (
         'road','handpump','overhead_tank','public_toilet','school',
@@ -52,8 +52,8 @@ CREATE INDEX IF NOT EXISTS idx_assets_ward_id ON assets (ward_id);
 
 -- Citizen grievance / issue reports
 CREATE TABLE IF NOT EXISTS issues (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    asset_id UUID REFERENCES assets(id) ON DELETE SET NULL,
+    id VARCHAR(64) PRIMARY KEY,
+    asset_id VARCHAR(64) REFERENCES assets(id) ON DELETE SET NULL,
     ward_id INTEGER REFERENCES wards(id) ON DELETE SET NULL,
     category TEXT NOT NULL,
     severity TEXT CHECK (severity IN ('low','medium','high','critical')) DEFAULT 'medium',
@@ -91,3 +91,19 @@ ON CONFLICT (panchayat_code) DO NOTHING;
 INSERT INTO wards (village_id, name)
 SELECT 1, 'Ward 3 - Kalyanpur'
 WHERE NOT EXISTS (SELECT 1 FROM wards WHERE village_id = 1 AND name = 'Ward 3 - Kalyanpur');
+
+-- Idempotent conversion from UUID to VARCHAR(64) for existing tables
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'assets' AND column_name = 'id' AND data_type = 'uuid'
+  ) THEN
+    ALTER TABLE issues DROP CONSTRAINT IF EXISTS issues_asset_id_fkey;
+    ALTER TABLE assets ALTER COLUMN id TYPE VARCHAR(64) USING id::text;
+    ALTER TABLE issues ALTER COLUMN id TYPE VARCHAR(64) USING id::text;
+    ALTER TABLE issues ALTER COLUMN asset_id TYPE VARCHAR(64) USING asset_id::text;
+    ALTER TABLE issues ADD CONSTRAINT issues_asset_id_fkey FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+

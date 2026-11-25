@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS wards (
 
 -- Infrastructure Assets table
 CREATE TABLE IF NOT EXISTS assets (
-  id UUID PRIMARY KEY,
+  id VARCHAR(64) PRIMARY KEY,
   ward_id INTEGER REFERENCES wards(id) ON DELETE SET NULL,
   asset_type TEXT NOT NULL CHECK (asset_type IN (
     'road','handpump','overhead_tank','public_toilet','school',
@@ -53,8 +53,8 @@ CREATE INDEX IF NOT EXISTS idx_assets_ward_id ON assets (ward_id);
 
 -- Grievances & Issues table
 CREATE TABLE IF NOT EXISTS issues (
-  id UUID PRIMARY KEY,
-  asset_id UUID REFERENCES assets(id) ON DELETE SET NULL,
+  id VARCHAR(64) PRIMARY KEY,
+  asset_id VARCHAR(64) REFERENCES assets(id) ON DELETE SET NULL,
   ward_id INTEGER REFERENCES wards(id) ON DELETE SET NULL,
   category TEXT NOT NULL,
   severity TEXT CHECK (severity IN ('low','medium','high','critical')) DEFAULT 'medium',
@@ -94,7 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_spatial_grid_ward ON spatial_grid_summary (ward_i
 -- Sync conflicts arbitration table
 CREATE TABLE IF NOT EXISTS sync_conflicts (
   id SERIAL PRIMARY KEY,
-  record_id UUID NOT NULL,
+  record_id VARCHAR(64) NOT NULL,
   table_name TEXT NOT NULL,
   client_payload JSONB NOT NULL,
   server_state JSONB NOT NULL,

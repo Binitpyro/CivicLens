@@ -55,19 +55,43 @@ export async function preloadMapTiles(
   let completed = 0;
   let failed = 0;
 
-  // Process downloads in concurrent batches of 6 to respect browser limits
+  // Open a named Cache Storage bucket for durable offline tile persistence.
+  // This survives app restarts on Capacitor Android (unlike the volatile HTTP cache).
+  const CACHE_NAME = 'civiclens-map-tiles-v1';
+  const tileCache = typeof window !== 'undefined' && 'caches' in window
+    ? await window.caches.open(CACHE_NAME).catch(() => null)
+    : null;
+
+  // Process downloads in concurrent batches of 6 to respect browser connection limits
   const BATCH_SIZE = 6;
   for (let i = 0; i < tileUrls.length; i += BATCH_SIZE) {
     const batch = tileUrls.slice(i, i + BATCH_SIZE);
     await Promise.all(
       batch.map(async (url) => {
         try {
-          // Fetch tile with cache mode to ensure response is stored in browser CacheStorage
-          const response = await fetch(url, { mode: 'cors', cache: 'force-cache' });
-          if (response.ok) {
-            completed++;
+          if (tileCache) {
+            // Check Cache Storage first to avoid re-downloading already-cached tiles
+            const cached = await tileCache.match(url);
+            if (cached) {
+              completed++;
+              return;
+            }
+            // Fetch fresh from network and persist in Cache Storage
+            const response = await fetch(url, { mode: 'cors' });
+            if (response.ok) {
+              await tileCache.put(url, response);
+              completed++;
+            } else {
+              failed++;
+            }
           } else {
-            failed++;
+            // Fallback: plain network fetch (no durable cache on this platform)
+            const response = await fetch(url, { mode: 'cors' });
+            if (response.ok) {
+              completed++;
+            } else {
+              failed++;
+            }
           }
         } catch {
           failed++;

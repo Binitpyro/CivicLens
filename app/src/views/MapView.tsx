@@ -17,6 +17,7 @@ import { preloadMapTiles, type PreloadProgress } from '../utils/tilePreloader';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { BottomSheet } from '../components/BottomSheet';
 import { IconPlus, IconGpsTarget } from '../components/CivicIcons';
+import { useWard } from '../context/WardContext';
 
 // Crisp inline SVGs for Leaflet DivIcons
 const SVG_ICONS: Record<string, string> = {
@@ -58,15 +59,18 @@ interface MapViewProps {
 }
 
 export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => {
+  const { wardId, wardLabel } = useWard();
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMap = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const hotspotLayerRef = useRef<L.LayerGroup | null>(null);
   const hasFittedBoundsRef = useRef<boolean>(false);
   const shouldCenterOnUserRef = useRef<boolean>(false);
   const hasAutoCenteredRef = useRef<boolean>(false);
 
   const userMarkerRef = useRef<L.Marker | null>(null);
   const userAccuracyCircleRef = useRef<L.Circle | null>(null);
+  const clickTargetMarkerRef = useRef<L.Marker | null>(null);
 
   // Opt-in live geolocation watch for MapView only (prevents battery drain on other screens)
   const { latitude: userLat, longitude: userLng, accuracy: userAccuracy, heading: userHeading, isLive, locateMe } = useGeolocation({ autoWatch: true });
@@ -74,7 +78,8 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
   const [assets, setAssets] = useState<LocalAsset[]>([]);
   const [issues, setIssues] = useState<LocalIssue[]>([]);
   const [activeFilter, setActiveFilter] = useState<string>('all');
-  const [selectedItem, setSelectedItem] = useState<{ title: string; type: string; details: string; status: string } | null>(null);
+  const [showHotspots, setShowHotspots] = useState<boolean>(false);
+  const [selectedItem, setSelectedItem] = useState<{ title: string; type: string; details: string; status: string; lat?: number; lng?: number } | null>(null);
   const [currentCoords, setCurrentCoords] = useState<{ lat: number; lng: number }>({ lat: 28.6139, lng: 77.2090 });
   const [isDataLoading, setIsDataLoading] = useState(true);
 
@@ -103,15 +108,14 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
           setIsDataLoading(false);
         }
 
-        const isLocalhost = API_BASE.includes('localhost') || API_BASE.includes('127.0.0.1');
-        if (navigator.onLine && !isLocalhost) {
+        if (navigator.onLine) {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3000);
+          const timeoutId = setTimeout(() => controller.abort(), 3500);
 
           try {
             const [assetRes, issueRes] = await Promise.all([
-              fetch(`${API_BASE}/assets`, { signal: controller.signal }),
-              fetch(`${API_BASE}/issues`, { signal: controller.signal }),
+              fetch(`${API_BASE}/assets?ward_id=${wardId}`, { signal: controller.signal }),
+              fetch(`${API_BASE}/issues?ward_id=${wardId}`, { signal: controller.signal }),
             ]);
 
             clearTimeout(timeoutId);
@@ -121,7 +125,7 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
               if (assetData.features) {
                 const remoteAssets: LocalAsset[] = assetData.features.map((f: RawGeoJSONFeature) => ({
                   id: String(f.properties.id),
-                  ward_id: Number(f.properties.ward_id || 1),
+                  ward_id: Number(f.properties.ward_id || wardId),
                   asset_type: String(f.properties.asset_type),
                   name: String(f.properties.name || ''),
                   lbd_asset_id: f.properties.lbd_asset_id ? String(f.properties.lbd_asset_id) : undefined,
@@ -144,7 +148,7 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
               if (issueData.features) {
                 const remoteIssues: LocalIssue[] = issueData.features.map((f: RawGeoJSONFeature) => ({
                   id: String(f.properties.id),
-                  ward_id: Number(f.properties.ward_id || 1),
+                  ward_id: Number(f.properties.ward_id || wardId),
                   category: String(f.properties.category),
                   severity: String(f.properties.severity || 'medium'),
                   description: String(f.properties.description || ''),
@@ -177,7 +181,7 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
     return () => {
       isMounted = false;
     };
-  }, [API_BASE]);
+  }, [API_BASE, wardId]);
 
   // Fetch backend Bounding Box features on moveend when online
   const fetchViewportBboxData = useCallback(async () => {
@@ -186,6 +190,7 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
 
     const bounds = map.getBounds();
     const params = new URLSearchParams({
+      ward_id: String(wardId),
       minLng: bounds.getWest().toFixed(5),
       minLat: bounds.getSouth().toFixed(5),
       maxLng: bounds.getEast().toFixed(5),
@@ -281,6 +286,67 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
     markersLayerRef.current = clusterGroup;
     leafletMap.current = map;
 
+    // Interactive Map Click: Drop pin at exact cursor location with quick 'Report Issue' action
+    map.on('click', (e: L.LeafletMouseEvent) => {
+      const { lat, lng } = e.latlng;
+      setCurrentCoords({ lat, lng });
+
+      if (clickTargetMarkerRef.current) {
+        clickTargetMarkerRef.current.remove();
+      }
+
+      const targetIcon = L.divIcon({
+        className: 'map-target-pin-wrap',
+        html: `
+          <div class="map-dropped-pin">
+            <div class="map-dropped-pin-ring"></div>
+            <div class="map-dropped-pin-icon">📍</div>
+          </div>
+        `,
+        iconSize: [36, 36],
+        iconAnchor: [18, 36],
+      });
+
+      const marker = L.marker([lat, lng], {
+        icon: targetIcon,
+        zIndexOffset: 1500,
+      }).addTo(map);
+
+      clickTargetMarkerRef.current = marker;
+
+      const popupHtml = `
+        <div class="map-click-popup">
+          <div class="map-popup-header">
+            <span class="map-popup-title">📍 Selected Location</span>
+          </div>
+          <div class="map-popup-coords tabular-nums">${lat.toFixed(5)}°N, ${lng.toFixed(5)}°E</div>
+          <div class="map-popup-meta">${wardLabel}</div>
+          <button type="button" id="btn-popup-report-action" class="map-popup-btn">
+            🚨 Report Issue Here
+          </button>
+        </div>
+      `;
+
+      marker.bindPopup(popupHtml, {
+        closeButton: true,
+        offset: [0, -28],
+        className: 'custom-map-popup',
+      }).openPopup();
+
+      marker.on('popupopen', () => {
+        const btn = document.getElementById('btn-popup-report-action');
+        if (btn) {
+          btn.onclick = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (onReportIssueAtLocation) {
+              onReportIssueAtLocation(lat, lng);
+            }
+          };
+        }
+      });
+    });
+
     let moveTimer: ReturnType<typeof setTimeout> | null = null;
     map.on('moveend', () => {
       if (moveTimer) clearTimeout(moveTimer);
@@ -325,9 +391,17 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
         userAccuracyCircleRef.current.remove();
         userAccuracyCircleRef.current = null;
       }
+      if (clickTargetMarkerRef.current) {
+        clickTargetMarkerRef.current.remove();
+        clickTargetMarkerRef.current = null;
+      }
       if (markersLayerRef.current) {
         markersLayerRef.current.clearLayers();
         markersLayerRef.current = null;
+      }
+      if (hotspotLayerRef.current) {
+        hotspotLayerRef.current.clearLayers();
+        hotspotLayerRef.current = null;
       }
       map.remove();
       leafletMap.current = null;
@@ -355,9 +429,9 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
     const visibleAssets = spatialIndex.searchAssets(bbox);
     const visibleIssues = spatialIndex.searchIssues(bbox);
 
-    // Fallback to full list if viewport index is empty initially
-    const assetsToRender = visibleAssets.length > 0 ? visibleAssets : assets;
-    const issuesToRender = visibleIssues.length > 0 ? visibleIssues : issues;
+    // After initial bounds fit, render only features in viewport. Initial mount falls back to all assets.
+    const assetsToRender = hasFittedBoundsRef.current ? visibleAssets : (visibleAssets.length > 0 ? visibleAssets : assets);
+    const issuesToRender = hasFittedBoundsRef.current ? visibleIssues : (visibleIssues.length > 0 ? visibleIssues : issues);
 
     // Render Village Assets
     assetsToRender.forEach((asset) => {
@@ -375,8 +449,22 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
           type: `Asset • ${asset.asset_type.replace('_', ' ')}`,
           details: `Status: ${asset.status.replace('_', ' ').toUpperCase()}`,
           status: asset.status,
+          lat: asset.latitude,
+          lng: asset.longitude,
         });
       });
+
+      marker.bindTooltip(
+        `
+        <div class="custom-marker-tooltip">
+          <div class="tooltip-badge asset-badge">${asset.asset_type.replace('_', ' ').toUpperCase()}</div>
+          <strong class="tooltip-title">${asset.name || asset.asset_type}</strong>
+          <div class="tooltip-coords tabular-nums">📍 ${asset.latitude.toFixed(5)}°N, ${asset.longitude.toFixed(5)}°E</div>
+          <div class="tooltip-action-prompt">Click to view or report issue →</div>
+        </div>
+        `,
+        { direction: 'top', offset: [0, -16], opacity: 0.98, className: 'custom-marker-tooltip' }
+      );
       addedMarkers.push(marker);
     });
 
@@ -394,8 +482,22 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
           type: `Grievance (${issue.severity.toUpperCase()})`,
           details: issue.description || 'No description provided.',
           status: issue.status,
+          lat: issue.latitude,
+          lng: issue.longitude,
         });
       });
+
+      marker.bindTooltip(
+        `
+        <div class="custom-marker-tooltip">
+          <div class="tooltip-badge issue-badge">${issue.severity.toUpperCase()}</div>
+          <strong class="tooltip-title">${issue.category} Issue</strong>
+          <div class="tooltip-coords tabular-nums">📍 ${issue.latitude.toFixed(5)}°N, ${issue.longitude.toFixed(5)}°E</div>
+          <div class="tooltip-action-prompt">Click to inspect grievance →</div>
+        </div>
+        `,
+        { direction: 'top', offset: [0, -16], opacity: 0.98, className: 'custom-marker-tooltip' }
+      );
       addedMarkers.push(marker);
     });
 
@@ -498,6 +600,71 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
     }
   };
 
+  // Hotspot overlay: fetch from /api/analytics/hotspots and draw L.circle per cluster
+  const fetchAndRenderHotspots = useCallback(async () => {
+    const map = leafletMap.current;
+    if (!map || !navigator.onLine) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/analytics/hotspots?ward_id=${wardId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+
+      // Lazy-create a dedicated LayerGroup for hotspots
+      if (!hotspotLayerRef.current) {
+        hotspotLayerRef.current = L.layerGroup().addTo(map);
+      }
+      hotspotLayerRef.current.clearLayers();
+
+      const SEVERITY_COLORS: Record<string, string> = {
+        critical: '#ef4444',
+        high:     '#f97316',
+        medium:   '#eab308',
+        low:      '#22c55e',
+      };
+
+      (data.features || []).forEach((f: any) => {
+        const count   = f.properties?.count || 1;
+        const severity = f.properties?.peak_severity || 'medium';
+        const coords  = f.geometry?.coordinates;
+        if (!coords) return;
+
+        const circle = L.circle([coords[1], coords[0]], {
+          radius:      Math.max(60, count * 40),   // min 60m, scale with issue density
+          color:       SEVERITY_COLORS[severity] || '#eab308',
+          fillColor:   SEVERITY_COLORS[severity] || '#eab308',
+          fillOpacity: 0.25,
+          weight:      2,
+        });
+
+        circle.bindTooltip(
+          `<div class="custom-marker-tooltip">
+            <div class="tooltip-badge issue-badge">${severity.toUpperCase()} HOTSPOT</div>
+            <strong class="tooltip-title">${count} Active Issue${count > 1 ? 's' : ''}</strong>
+            <div class="tooltip-action-prompt">Complaint density cluster</div>
+          </div>`,
+          { direction: 'top', opacity: 0.98, className: 'custom-marker-tooltip' }
+        );
+
+        hotspotLayerRef.current!.addLayer(circle);
+      });
+    } catch {
+      // Offline or API unavailable — silently skip
+    }
+  }, [API_BASE]);
+
+  // Toggle hotspot layer visibility
+  useEffect(() => {
+    const map = leafletMap.current;
+    if (!map) return;
+
+    if (showHotspots) {
+      fetchAndRenderHotspots();
+    } else if (hotspotLayerRef.current) {
+      hotspotLayerRef.current.clearLayers();
+    }
+  }, [showHotspots, fetchAndRenderHotspots]);
+
   // Preload Map Tiles for Ward Offline Usage
   const handlePreloadTiles = async () => {
     if (isPreloadingTiles) return;
@@ -594,6 +761,15 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
           >
             Assets ({assets.length})
           </button>
+          <button
+            type="button"
+            className={`filter-chip ${showHotspots ? 'active' : ''}`}
+            onClick={() => setShowHotspots(prev => !prev)}
+            aria-label="Toggle complaint density hotspot overlay"
+            title={navigator.onLine ? 'Toggle hotspot overlay' : 'Hotspots require network'}
+          >
+            🔥 Hotspots
+          </button>
         </div>
       </div>
 
@@ -623,11 +799,35 @@ export const MapView: React.FC<MapViewProps> = ({ onReportIssueAtLocation }) => 
       >
         {selectedItem && (
           <div>
-            <span className={`status-badge ${selectedItem.status === 'active' || selectedItem.status === 'resolved' ? 'submitted' : 'urgent'}`}>
-              {selectedItem.status.toUpperCase()}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+              <span className={`status-badge ${selectedItem.status === 'active' || selectedItem.status === 'resolved' ? 'submitted' : 'urgent'}`}>
+                {selectedItem.status.toUpperCase()}
+              </span>
+              {selectedItem.lat !== undefined && selectedItem.lng !== undefined && (
+                <span className="sheet-coords-badge tabular-nums">
+                  📍 {selectedItem.lat.toFixed(5)}°N, {selectedItem.lng.toFixed(5)}°E
+                </span>
+              )}
+            </div>
             <p className="sheet-item-type">{selectedItem.type}</p>
             <p className="sheet-item-details">{selectedItem.details}</p>
+
+            {onReportIssueAtLocation && selectedItem.lat !== undefined && selectedItem.lng !== undefined && (
+              <button
+                type="button"
+                className="btn-primary-action"
+                style={{ marginTop: '14px', width: '100%' }}
+                onClick={() => {
+                  const lat = selectedItem.lat!;
+                  const lng = selectedItem.lng!;
+                  setSelectedItem(null);
+                  onReportIssueAtLocation(lat, lng);
+                }}
+              >
+                <IconPlus size={18} />
+                <span>Report Issue at this Location</span>
+              </button>
+            )}
           </div>
         )}
       </BottomSheet>

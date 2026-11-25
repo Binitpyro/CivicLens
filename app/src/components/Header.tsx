@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useOfflineSync } from '../hooks/useOfflineSync';
 import { setAppLanguage } from '../i18n';
+import { useWard } from '../context/WardContext';
 import { 
   IconCivicLensLogo, 
   IconSync, 
@@ -20,6 +21,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ theme = 'light', onToggleTheme, onLogout }) => {
   const { t, i18n } = useTranslation();
+  const { wardLabel } = useWard();
   const { isOnline, outboxCount, isSyncing, coldStartNotice, triggerSync } = useOfflineSync();
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('civiclens-theme') as 'dark' | 'light') || theme || 'light';
@@ -58,7 +60,7 @@ export const Header: React.FC<HeaderProps> = ({ theme = 'light', onToggleTheme, 
           <div className="brand-title">
             <span>{t('appName')}</span>
           </div>
-          <span className="brand-subtitle">WARD 3 · KALYANPUR GP</span>
+          <span className="brand-subtitle">{wardLabel.toUpperCase()}</span>
         </div>
       </div>
 

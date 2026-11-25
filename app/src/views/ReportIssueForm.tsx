@@ -5,6 +5,7 @@ import { compressPhotoOffThread } from '../services/photoWorker';
 import { db, encryptPII } from '../db';
 import { useOfflineSync } from '../hooks/useOfflineSync';
 import { getCategoryIcon } from '../utils/iconHelpers';
+import { useWard } from '../context/WardContext';
 import {
   IconCamera,
   IconCrosshair,
@@ -28,6 +29,7 @@ const CATEGORIES = [
 
 export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, initialCoords }) => {
   const { t } = useTranslation();
+  const { wardId, wardLabel } = useWard();
   const { latitude: geoLat, longitude: geoLng, accuracy, loading: geoLoading, locateMe } = useGeolocation();
   const { triggerSync } = useOfflineSync();
 
@@ -70,7 +72,7 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
 
       const newIssuePayload = {
         id: issueId,
-        ward_id: 1,
+        ward_id: wardId,
         category,
         severity,
         description,
@@ -93,7 +95,7 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
           action: 'create',
           payload: {
             id: issueId,
-            ward_id: 1,
+            ward_id: wardId,
             category,
             severity,
             description,
@@ -131,7 +133,7 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
     <div className="report-form-container">
       <div className="form-header-card">
         <h2 className="view-heading">{t('actions.reportIssue')}</h2>
-        <p className="view-subheading">Log public infrastructure issues for Gram Panchayat Ward 3.</p>
+        <p className="view-subheading">Log public infrastructure issues for {wardLabel}.</p>
       </div>
 
       {successMsg && (
@@ -217,7 +219,7 @@ export const ReportIssueForm: React.FC<ReportIssueFormProps> = ({ onSuccess, ini
               )}
             </div>
             <div className="gps-fix-meta">
-              {accuracy !== null ? `Accuracy ±${accuracy}m` : 'Ward 3 · Kalyanpur'}
+              {accuracy !== null ? `Accuracy ±${accuracy}m` : wardLabel}
             </div>
           </div>
           <button

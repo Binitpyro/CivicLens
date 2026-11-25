@@ -23,12 +23,29 @@ export async function processSyncBatch(req: AuthRequest, res: Response) {
     try {
       const { record_id, table_name, action, payload, client_seq_num } = item;
 
-      // 1. Handle Delete Action
+      // 1. Handle Delete Action with Role-Based & Ownership Verification
       if (action === 'delete') {
-        if (table_name === 'issues') {
-          await pool.query('DELETE FROM issues WHERE id = $1', [record_id]);
-        } else if (table_name === 'assets') {
+        const userRole = req.user?.role;
+        const userId = req.user?.id;
+
+        if (table_name === 'assets') {
+          // Only admin or panchayat_officer can delete infrastructure assets
+          if (userRole !== 'admin' && userRole !== 'panchayat_officer') {
+            acks.push({ record_id, status: 'error', error: 'Unauthorized: Admin or Panchayat Officer role required to delete assets' });
+            continue;
+          }
           await pool.query('DELETE FROM assets WHERE id = $1', [record_id]);
+        } else if (table_name === 'issues') {
+          // Admin or officer can delete any issue; regular users can only delete issues they personally reported
+          if (userRole === 'admin' || userRole === 'panchayat_officer') {
+            await pool.query('DELETE FROM issues WHERE id = $1', [record_id]);
+          } else {
+            const delRes = await pool.query('DELETE FROM issues WHERE id = $1 AND reported_by = $2', [record_id, userId]);
+            if (delRes.rowCount === 0) {
+              acks.push({ record_id, status: 'error', error: 'Unauthorized: Cannot delete grievances reported by other users' });
+              continue;
+            }
+          }
         }
         acks.push({ record_id, status: 'synced' });
         continue;
@@ -72,7 +89,7 @@ export async function processSyncBatch(req: AuthRequest, res: Response) {
           [
             record_id, 
             asset_id || null, 
-            ward_id || 1, 
+            req.user?.ward_id || ward_id || 1, 
             category, 
             severity || 'medium', 
             description || '', 
@@ -110,7 +127,7 @@ export async function processSyncBatch(req: AuthRequest, res: Response) {
              attributes = EXCLUDED.attributes,
              version_id = assets.version_id + 1,
              updated_at = now()`,
-          [record_id, ward_id || 1, asset_type, name || null, lbd_asset_id || null, status || 'active', longitude, latitude, JSON.stringify(attributes || {})]
+          [record_id, req.user?.ward_id || ward_id || 1, asset_type, name || null, lbd_asset_id || null, status || 'active', longitude, latitude, JSON.stringify(attributes || {})]
         );
 
         acks.push({ record_id, status: 'synced' });
