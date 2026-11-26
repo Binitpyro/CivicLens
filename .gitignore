@@ -51,3 +51,8 @@ Thumbs.db
 coverage/
 .tsbuildinfo
 /.hallmark
+/graphify-out
+.claude_api_src.tgz
+.claude_app_src.tgz
+/.impeccable
+/reports

@@ -1,12 +1,47 @@
-/* CivicLens global base */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+/* CivicLens global base styles & browser surfaces */
+@import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import './tokens.css';
 
-* {
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Browser Surfaces: Selection */
+::selection {
+  background-color: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+/* Browser Surfaces: Inputs Caret */
+input, textarea {
+  caret-color: var(--color-accent);
+}
+
+/* Browser Surfaces: Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-rule-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-rule-strong);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-muted);
 }
 
 html, body {
@@ -15,6 +50,7 @@ html, body {
   background-color: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-body);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: clip;
@@ -22,27 +58,31 @@ html, body {
 
 #root {
   width: 100%;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   background-color: var(--color-paper);
   display: flex;
   flex-direction: column;
   position: relative;
+  overflow: hidden;
 }
 
-/* On wide screens, present the app as a framed mobile container */
+/* On wide screens (tablets/desktops), present the app as a cartographic field console */
 @media (min-width: 768px) {
   body {
     display: flex;
     justify-content: center;
     align-items: center;
     background-color: var(--color-paper-subtle);
+    background-image: radial-gradient(var(--color-rule-strong) 1px, transparent 1px);
+    background-size: 20px 20px;
   }
 
   #root {
-    max-width: 520px;
+    max-width: 540px;
     height: 94vh;
-    border: 1px solid var(--color-rule);
+    max-height: 880px;
+    border: 1px solid var(--color-rule-strong);
     border-radius: var(--radius-lg);
     overflow: hidden;
     box-shadow: var(--shadow-modal);

@@ -1,0 +1,4 @@
+# CivicLens Robots Policy
+User-agent: *
+Allow: /
+Disallow: /api/

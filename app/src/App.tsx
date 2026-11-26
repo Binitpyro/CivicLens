@@ -4,6 +4,8 @@ import './App.css';
 import { Header } from './components/Header';
 import { BottomNav, type TabType } from './components/BottomNav';
 import { StoragePersistModal } from './components/StoragePersistModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { GeolocationProvider } from './hooks/useGeolocation';
 import type { UserProfile } from './services/apiService';
 
 // Code-split heavy view components for fast initial load
@@ -28,6 +30,8 @@ export function App() {
   const [activeTab, setActiveTab] = useState<TabType>('map');
   const [isPrintView, setIsPrintView] = useState<boolean>(false);
   const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [quickAddAssetType, setQuickAddAssetType] = useState<string | null>(null);
+  const [pinPickTarget, setPinPickTarget] = useState<'report' | 'quickAdd' | null>(null);
   const [user, setUser] = useState<UserProfile | null>(() => {
     try {
       const token = localStorage.getItem('civiclens_token');
@@ -43,17 +47,23 @@ export function App() {
 
   if (!user) {
     return (
-      <Suspense fallback={<ViewLoadingFallback />}>
-        <AuthScreen onAuthSuccess={setUser} />
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={<ViewLoadingFallback />}>
+          <AuthScreen onAuthSuccess={setUser} />
+        </Suspense>
+      </ErrorBoundary>
     );
   }
 
   if (isPrintView) {
     return (
-      <Suspense fallback={<ViewLoadingFallback />}>
-        <ReportPrintView onBack={() => setIsPrintView(false)} />
-      </Suspense>
+      <ErrorBoundary>
+        <GeolocationProvider>
+          <Suspense fallback={<ViewLoadingFallback />}>
+            <ReportPrintView onBack={() => setIsPrintView(false)} />
+          </Suspense>
+        </GeolocationProvider>
+      </ErrorBoundary>
     );
   }
 
@@ -63,50 +73,111 @@ export function App() {
     setUser(null);
   };
 
+  const handleTabChange = (nextTab: TabType) => {
+    setPinPickTarget(null);
+    setActiveTab(nextTab);
+  };
+
   return (
-    <div className="app-mobile-shell">
-      <StoragePersistModal />
+    <ErrorBoundary>
+      <GeolocationProvider>
+        <div className="app-mobile-shell">
+          <StoragePersistModal />
 
-      <Header onLogout={handleLogout} />
+          <Header
+            onLogout={handleLogout}
+            userName={user.name}
+            userRole={user.role}
+          />
 
-      <main className="main-content-viewport">
-        <Suspense fallback={<ViewLoadingFallback />}>
-          {activeTab === 'map' && (
-            <MapView
-              onReportIssueAtLocation={(lat, lng) => {
-                setSelectedCoords({ lat, lng });
-                setActiveTab('report');
-              }}
-            />
-          )}
+          <main className={`main-content-viewport ${activeTab === 'map' ? 'is-map-active' : ''}`}>
+            <Suspense fallback={<ViewLoadingFallback />}>
+              {/* Keep MapView mounted so Leaflet map zoom, pan, and filter state are preserved */}
+              <div className={`map-tab-pane ${activeTab === 'map' ? 'is-active' : 'is-hidden'}`}>
+                <MapView
+                  userRole={user.role}
+                  pinPickTarget={pinPickTarget}
+                  onCancelPinPick={() => setPinPickTarget(null)}
+                  onPinPicked={(lat, lng) => {
+                    const target = pinPickTarget;
+                    setPinPickTarget(null);
+                    setSelectedCoords({ lat, lng });
+                    if (target === 'quickAdd') {
+                      setActiveTab('quickAdd');
+                    } else {
+                      setQuickAddAssetType(null);
+                      setActiveTab('report');
+                    }
+                  }}
+                  onReportIssueAtLocation={(lat, lng) => {
+                    setPinPickTarget(null);
+                    setSelectedCoords({ lat, lng });
+                    setQuickAddAssetType(null);
+                    setActiveTab('report');
+                  }}
+                  onQuickAddAtLocation={(lat, lng, assetType) => {
+                    setPinPickTarget(null);
+                    setSelectedCoords({ lat, lng });
+                    setQuickAddAssetType(assetType ?? null);
+                    setActiveTab('quickAdd');
+                  }}
+                />
+              </div>
 
-          {activeTab === 'report' && (
-            <ReportIssueForm
-              initialCoords={selectedCoords}
-              onSuccess={() => {
-                setSelectedCoords(null);
-                setActiveTab('myReports');
-              }}
-            />
-          )}
+              {activeTab === 'report' && (
+                <ReportIssueForm
+                  wardId={user.ward_id || 1}
+                  initialCoords={selectedCoords}
+                  onClearSelectedCoords={() => setSelectedCoords(null)}
+                  onPickOnMap={() => {
+                    setPinPickTarget('report');
+                    setActiveTab('map');
+                  }}
+                  onSuccess={() => {
+                    setSelectedCoords(null);
+                    setQuickAddAssetType(null);
+                    setActiveTab('myReports');
+                  }}
+                />
+              )}
 
-          {activeTab === 'myReports' && <MyReportsView />}
+              {activeTab === 'myReports' && (
+                <MyReportsView onStartReport={() => setActiveTab('report')} />
+              )}
 
-          {activeTab === 'quickAdd' && <VolunteerQuickAdd />}
+              {activeTab === 'quickAdd' && (
+                <VolunteerQuickAdd
+                  key={
+                    selectedCoords
+                      ? `${selectedCoords.lat.toFixed(6)},${selectedCoords.lng.toFixed(6)}:${quickAddAssetType ?? ''}`
+                      : 'live-gps'
+                  }
+                  wardId={user.ward_id || 1}
+                  initialCoords={selectedCoords}
+                  initialAssetType={quickAddAssetType}
+                  onClearSelectedCoords={() => setSelectedCoords(null)}
+                  onPickOnMap={() => {
+                    setPinPickTarget('quickAdd');
+                    setActiveTab('map');
+                  }}
+                />
+              )}
 
-          {activeTab === 'admin' && (
-            <AdminDashboard
-              onOpenPrintView={() => setIsPrintView(true)}
-            />
-          )}
-        </Suspense>
-      </main>
+              {activeTab === 'admin' && (
+                <AdminDashboard
+                  onOpenPrintView={() => setIsPrintView(true)}
+                />
+              )}
+            </Suspense>
+          </main>
 
-      <BottomNav
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-      />
-    </div>
+          <BottomNav
+            activeTab={activeTab}
+            setActiveTab={handleTabChange}
+          />
+        </div>
+      </GeolocationProvider>
+    </ErrorBoundary>
   );
 }
 

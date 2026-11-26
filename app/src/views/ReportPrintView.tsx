@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { db, type LocalAsset, type LocalIssue } from '../db';
-import { IconPrinter } from '../components/CivicIcons';
+import { IconPrinter, IconArrowLeft } from '../components/CivicIcons';
 
 interface ReportPrintViewProps {
   onBack: () => void;
@@ -9,7 +9,7 @@ interface ReportPrintViewProps {
 export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
   const [assets, setAssets] = useState<LocalAsset[]>([]);
   const [issues, setIssues] = useState<LocalIssue[]>([]);
-  const [coverageGaps, setCoverageGaps] = useState<any[]>([]);
+  const [coverageGaps, setCoverageGaps] = useState<Array<{ properties?: { id?: string; name?: string; type?: string; gap_type?: string } }>>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4000/api';
@@ -22,7 +22,11 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
         setAssets(localAssets);
         setIssues(localIssues);
 
-        if (navigator.onLine) {
+        const isOfflineDemo =
+          typeof window !== 'undefined' &&
+          localStorage.getItem('civiclens_token') === 'offline-demo-token';
+
+        if (navigator.onLine && !isOfflineDemo) {
           try {
             const gapRes = await fetch(`${API_BASE}/analytics/coverage-gaps`);
             if (gapRes.ok) {
@@ -66,7 +70,8 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
           className="filter-chip chip-action"
           onClick={onBack}
         >
-          ← Back to Dashboard
+          <IconArrowLeft size={16} />
+          <span>Back to Dashboard</span>
         </button>
         <button
           type="button"
@@ -81,7 +86,7 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
 
       <div className="printable-document">
         <div className="doc-header">
-          <h1>GRAM PANCHAYAT INFRASTRUCTURE & GRIEVANCE REPORT</h1>
+          <h1>GRAM PANCHAYAT INFRASTRUCTURE &amp; GRIEVANCE REPORT</h1>
           <h2>Gram Panchayat Monitoring Report — Ward 3 (Kalyanpur)</h2>
           <p className="doc-meta">
             Generated Date: {new Date().toLocaleDateString()} | System: CivicLens GIS Platform
@@ -159,13 +164,13 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({ onBack }) => {
           {coverageGaps.length > 0 ? (
             <div>
               {coverageGaps.map((gap, idx) => (
-                <p key={gap.properties?.id || idx} className="doc-note" style={{ color: '#0F172A', marginBottom: 4 }}>
+                <p key={gap.properties?.id || idx} className="doc-note doc-note-gap">
                   <strong>Target Action Required:</strong> {gap.properties?.name || gap.properties?.type} — {gap.properties?.gap_type}
                 </p>
               ))}
             </div>
           ) : (
-            <p className="doc-note" style={{ color: '#334155' }}>
+            <p className="doc-note doc-note-summary">
               <strong>Target Action Required:</strong> Schools and health facilities in Ward 3 currently have functional drinking water access within 500m buffer zone.
             </p>
           )}

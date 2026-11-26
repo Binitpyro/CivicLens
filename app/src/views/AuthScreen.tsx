@@ -4,18 +4,27 @@ import { loginUser, registerUser, type UserProfile } from '../services/apiServic
 import { setAppLanguage } from '../i18n';
 import {
   IconCivicLensLogo,
-  IconCheck
+  IconCheck,
+  IconEye,
+  IconEyeOff,
 } from '../components/CivicIcons';
 
 interface AuthScreenProps {
   onAuthSuccess: (user: UserProfile) => void;
 }
 
+const AUTH_LANGS = [
+  { code: 'en', label: 'EN', aria: 'English language' },
+  { code: 'hi', label: 'हिन्दी', aria: 'Hindi language' },
+  { code: 'mr', label: 'मराठी', aria: 'Marathi language' },
+] as const;
+
 export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   const { t, i18n } = useTranslation();
   const [isLogin, setIsLogin] = useState(true);
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [serverOffline, setServerOffline] = useState(false);
@@ -51,8 +60,8 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
       localStorage.setItem('civiclens_token', res.token);
       localStorage.setItem('civiclens_user', JSON.stringify(res.user));
       onAuthSuccess(res.user);
-    } catch (err: any) {
-      const errMsg = err?.message || '';
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : '';
       const isNetworkIssue =
         errMsg.includes('Failed to fetch') ||
         errMsg.includes('Network') ||
@@ -75,30 +84,18 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
     <div className="auth-screen">
       <div className="auth-lang-bar">
         <div className="lang-selector" role="group" aria-label="Language selection">
-          <button
-            type="button"
-            className={i18n.language === 'en' ? 'active' : ''}
-            onClick={() => setAppLanguage('en')}
-            aria-label="English language"
-          >
-            EN
-          </button>
-          <button
-            type="button"
-            className={i18n.language === 'hi' ? 'active' : ''}
-            onClick={() => setAppLanguage('hi')}
-            aria-label="Hindi language"
-          >
-            HI
-          </button>
-          <button
-            type="button"
-            className={i18n.language === 'mr' ? 'active' : ''}
-            onClick={() => setAppLanguage('mr')}
-            aria-label="Marathi language"
-          >
-            MR
-          </button>
+          {AUTH_LANGS.map((lng) => (
+            <button
+              key={lng.code}
+              type="button"
+              className={i18n.language === lng.code ? 'active' : ''}
+              onClick={() => setAppLanguage(lng.code)}
+              aria-label={lng.aria}
+              aria-pressed={i18n.language === lng.code}
+            >
+              {lng.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -106,7 +103,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
         <div className="brand-icon-box auth-brand-icon" aria-hidden="true">
           <IconCivicLensLogo size={28} />
         </div>
-        <h1>CivicLens</h1>
+        <h1>{t('appName')}</h1>
         <p>{t('tagline')}</p>
       </div>
 
@@ -122,9 +119,9 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
                 <button
                   type="button"
                   onClick={() => handleOfflineLogin(name, phone)}
-                  className="filter-chip active chip-block"
+                  className="btn-primary-action"
                 >
-                  <IconCheck size={14} />
+                  <IconCheck size={16} />
                   <span>{t('auth.useOfflineNow')}</span>
                 </button>
               </div>
@@ -139,8 +136,9 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
               <input
                 id="auth-name"
                 type="text"
+                autoComplete="name"
                 value={name}
-                onChange={e => setName(e.target.value)}
+                onChange={(e) => setName(e.target.value)}
                 required
                 className="form-input"
               />
@@ -153,8 +151,9 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
               id="auth-phone"
               type="tel"
               inputMode="tel"
+              autoComplete="tel"
               value={phone}
-              onChange={e => setPhone(e.target.value)}
+              onChange={(e) => setPhone(e.target.value)}
               required
               className="form-input"
               placeholder="e.g. 9876543210"
@@ -163,14 +162,26 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
 
           <div className="form-input-group">
             <label htmlFor="auth-password" className="form-label">{t('auth.password')}</label>
-            <input
-              id="auth-password"
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              className="form-input"
-            />
+            <div className="password-field-wrap">
+              <input
+                id="auth-password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete={isLogin ? 'current-password' : 'new-password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="form-input password-field-input"
+              />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+                aria-pressed={showPassword}
+              >
+                {showPassword ? <IconEyeOff size={18} /> : <IconEye size={18} />}
+              </button>
+            </div>
           </div>
 
           <button
@@ -178,13 +189,14 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
             className="btn-primary-action"
             disabled={loading}
           >
-            {loading ? 'Authenticating…' : (isLogin ? t('auth.loginBtn') : t('auth.registerBtn'))}
+            {loading ? t('auth.authenticating') : (isLogin ? t('auth.loginBtn') : t('auth.registerBtn'))}
           </button>
         </form>
 
         <div className="auth-switch">
           <button
             type="button"
+            className="auth-switch-btn"
             onClick={() => setIsLogin(!isLogin)}
           >
             {isLogin ? t('auth.switchToRegister') : t('auth.switchToLogin')}
@@ -196,9 +208,9 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           <button
             type="button"
             onClick={() => handleOfflineLogin()}
-            className="filter-chip chip-block"
+            className="btn-secondary auth-offline-btn"
           >
-            <IconCheck size={14} color="var(--color-status-active)" />
+            <IconCheck size={16} color="var(--color-status-active)" />
             <span>{t('auth.offlineMode')}</span>
           </button>
         </div>

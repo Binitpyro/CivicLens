@@ -1,10 +1,47 @@
 import type { Request, Response } from 'express';
+import { z } from 'zod';
 import { pool } from '../config/db';
 import type { AuthRequest } from '../middleware/auth';
 
+const queryAssetSchema = z.object({
+  type: z.string().trim().optional(),
+  ward_id: z.coerce.number().int().positive().optional(),
+});
+
+const createAssetSchema = z.object({
+  id: z.string().trim().min(1, 'ID is required'),
+  ward_id: z.coerce.number().int().positive().default(1),
+  asset_type: z.enum([
+    'road',
+    'handpump',
+    'overhead_tank',
+    'public_toilet',
+    'school',
+    'anganwadi',
+    'phc',
+    'streetlight',
+    'drainage',
+    'ration_shop',
+  ]),
+  name: z.string().trim().max(200).nullable().optional(),
+  lbd_asset_id: z.string().trim().max(100).nullable().optional(),
+  status: z.enum(['active', 'non_functional', 'under_construction']).default('active'),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  attributes: z.record(z.string(), z.any()).optional().default({}),
+});
+
 export async function getAssetsGeoJSON(req: Request, res: Response) {
   try {
-    const { type, ward_id } = req.query;
+    const parseResult = queryAssetSchema.safeParse(req.query);
+    if (!parseResult.success) {
+      return res.status(400).json({
+        error: 'Invalid query parameters',
+        details: parseResult.error.flatten().fieldErrors,
+      });
+    }
+
+    const { type, ward_id } = parseResult.data;
     let query = `
       SELECT 
         id, 
@@ -59,10 +96,25 @@ export async function getAssetsGeoJSON(req: Request, res: Response) {
 
 export async function createAsset(req: AuthRequest, res: Response) {
   try {
-    const { id, ward_id, asset_type, name, lbd_asset_id, status, latitude, longitude, attributes } = req.body;
-    if (!id || !asset_type || latitude === undefined || longitude === undefined) {
-      return res.status(400).json({ error: 'ID, asset_type, latitude, and longitude are required' });
+    const parseResult = createAssetSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: parseResult.error.flatten().fieldErrors,
+      });
     }
+
+    const {
+      id,
+      ward_id,
+      asset_type,
+      name,
+      lbd_asset_id,
+      status,
+      latitude,
+      longitude,
+      attributes,
+    } = parseResult.data;
 
     const result = await pool.query(
       `INSERT INTO assets (id, ward_id, asset_type, name, lbd_asset_id, status, location, attributes)
@@ -74,7 +126,17 @@ export async function createAsset(req: AuthRequest, res: Response) {
          version_id = assets.version_id + 1,
          updated_at = now()
        RETURNING id, asset_type, status, version_id`,
-      [id, ward_id || 1, asset_type, name, lbd_asset_id, status || 'active', longitude, latitude, JSON.stringify(attributes || {})]
+      [
+        id,
+        ward_id,
+        asset_type,
+        name || null,
+        lbd_asset_id || null,
+        status,
+        longitude,
+        latitude,
+        JSON.stringify(attributes || {}),
+      ]
     );
 
     return res.status(201).json(result.rows[0]);

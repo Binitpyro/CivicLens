@@ -1,10 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-
-if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
-  console.warn('CRITICAL SECURITY WARNING: JWT_SECRET environment variable is missing in production!');
-}
-const JWT_SECRET = process.env.JWT_SECRET || 'civiclens-super-secret-key-2026';
+import { JWT_SECRET } from '../config/secrets';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -28,6 +24,26 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
       return res.status(403).json({ error: 'Invalid or expired token' });
     }
     req.user = user as NonNullable<AuthRequest['user']>;
+    next();
+  });
+}
+
+/**
+ * Optional authentication middleware:
+ * Attaches user to req.user if a valid token is present, but does not block requests without token.
+ */
+export function optionalAuthenticateToken(req: AuthRequest, _res: Response, next: NextFunction) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return next();
+  }
+
+  jwt.verify(token, JWT_SECRET, (_err: any, user: any) => {
+    if (user) {
+      req.user = user as NonNullable<AuthRequest['user']>;
+    }
     next();
   });
 }

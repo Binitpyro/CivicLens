@@ -1,39 +1,53 @@
-/* CivicLens design tokens — single source of truth for color, type, space. */
+/* CivicLens design tokens — Survey Atlas & Civic Governance System. */
 
 :root {
-  /* Surfaces */
-  --color-paper:        #F7F8FA;
-  --color-paper-2:      #FFFFFF;
-  --color-paper-subtle: #EFF1F4;
-  --color-surface:      #FFFFFF;
-  --color-rule:         #E2E5EA;
-  --color-rule-strong:  #C9CED6;
+  /* Surfaces — light mode (warm topographic paper vs crisp card sheets) */
+  --color-paper:         #F4F1EA;
+  --color-paper-2:       #FAF8F4;
+  --color-paper-subtle:  #EAE5DC;
+  --color-surface:       #FFFFFF;
+  --color-rule:          #DFD9CE;
+  --color-rule-strong:   #C5BEB0;
 
-  /* Text */
-  --color-ink:          #0F172A;
-  --color-ink-2:        #475569;
-  --color-ink-muted:    #64748B;
+  /* Text & Ink — light mode (WCAG AA/AAA compliant) */
+  --color-ink:           #141B22;
+  --color-ink-2:         #3A4652;
+  --color-ink-muted:     #5C6773;
 
-  /* Accent — single restrained municipal blue */
-  --color-accent:        #1D4ED8;
-  --color-accent-hover:  #1E40AF;
-  --color-accent-subtle: #EEF2FF;
+  /* Accent — Authoritative Civic Forest Emerald */
+  --color-accent:        #0F5C4D;
+  --color-accent-hover:  #0B473B;
+  --color-accent-subtle: #E6F2EF;
   --color-accent-ink:    #FFFFFF;
-  --color-focus:         #1D4ED8;
+  --color-focus:         #0F5C4D;
 
-  /* Semantic status */
-  --color-status-active:     #15803D;
-  --color-status-active-bg:  #F0FDF4;
-  --color-status-pending:    #B45309;
-  --color-status-pending-bg: #FFFBEB;
-  --color-status-urgent:     #B91C1C;
-  --color-status-urgent-bg:  #FEF2F2;
-  --color-status-info:       #0369A1;
-  --color-status-info-bg:    #F0F9FF;
+  /* Semantic status — light mode */
+  --color-status-active:      #15803D;
+  --color-status-active-bg:   #ECFDF3;
+  --color-status-active-rule: #A7F3D0;
+  --color-status-pending:     #B45309;
+  --color-status-pending-bg:  #FFFBEB;
+  --color-status-pending-rule:#FDE68A;
+  --color-status-high:        #9A3412;
+  --color-status-high-bg:     #FFEDD5;
+  --color-status-high-rule:   #FDBA74;
+  --color-status-urgent:      #B91C1C;
+  --color-status-urgent-bg:   #FEF2F2;
+  --color-status-urgent-rule: #FECACA;
+  --color-status-info:        #0369A1;
+  --color-status-info-bg:     #F0F9FF;
+  --color-status-info-rule:   #BAE6FD;
+
+  /* GIS Map Layer Accents */
+  --color-layer-water:        #0284C7;
+  --color-layer-lighting:     #D97706;
+  --color-layer-sanitation:   #0F5C4D;
+  --color-layer-education:    #6D28D9;
+  --color-layer-health:       #B91C1C;
 
   /* Typography */
-  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-body:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body:    'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* 4pt spacing scale */
@@ -48,62 +62,83 @@
   --space-3xl: 64px;
 
   /* Type scale */
-  --text-2xs: 0.6875rem;
-  --text-xs:  0.75rem;
-  --text-sm:  0.875rem;
-  --text-base:1rem;
-  --text-md:  1.125rem;
-  --text-lg:  1.25rem;
-  --text-xl:  1.5rem;
-  --text-2xl: 1.875rem;
+  --text-2xs:  0.6875rem; /* 11px */
+  --text-xs:   0.75rem;   /* 12px */
+  --text-sm:   0.875rem;  /* 14px */
+  --text-base: 1rem;      /* 16px */
+  --text-md:   1.125rem;  /* 18px */
+  --text-lg:   1.25rem;   /* 20px */
+  --text-xl:   1.5rem;    /* 24px */
+  --text-2xl:  1.875rem;  /* 30px */
 
   /* Radii */
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-xs:   4px;
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
   --radius-pill: 9999px;
   --radius-full: 9999px;
 
   /* Elevation */
-  --shadow-subtle: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --shadow-card:   0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow-modal:  0 12px 28px rgba(15, 23, 42, 0.12), 0 2px 4px rgba(15, 23, 42, 0.06);
+  --shadow-subtle: 0 1px 2px rgba(20, 27, 34, 0.05);
+  --shadow-card:   0 2px 6px rgba(20, 27, 34, 0.06), 0 1px 2px rgba(20, 27, 34, 0.04);
+  --shadow-float:  0 6px 16px -2px rgba(20, 27, 34, 0.10), 0 2px 6px -1px rgba(20, 27, 34, 0.05);
+  --shadow-modal:  0 16px 36px -6px rgba(20, 27, 34, 0.16), 0 4px 10px -2px rgba(20, 27, 34, 0.06);
 
   /* Motion */
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --dur-fast: 150ms;
-  --dur-normal: 220ms;
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast:    150ms;
+  --dur-normal:  220ms;
 }
 
 [data-theme="dark"] {
-  --color-paper:        #0B1120;
-  --color-paper-2:      #111827;
-  --color-paper-subtle: #1E293B;
-  --color-surface:      #111827;
-  --color-rule:         #24304A;
-  --color-rule-strong:  #3B4A68;
+  /* Surfaces — dark mode */
+  --color-paper:         #0C1218;
+  --color-paper-2:       #131B24;
+  --color-paper-subtle:  #1A242F;
+  --color-surface:       #131B24;
+  --color-rule:          #253241;
+  --color-rule-strong:   #394B60;
 
-  --color-ink:          #F1F5F9;
-  --color-ink-2:        #B6C2D2;
-  --color-ink-muted:    #8A99B0;
+  /* Text & Ink — dark mode (WCAG AA/AAA compliant) */
+  --color-ink:           #F1F5F9;
+  --color-ink-2:         #CBD5E1;
+  --color-ink-muted:     #8FA0B3;
 
-  --color-accent:        #60A5FA;
-  --color-accent-hover:  #93C5FD;
-  --color-accent-subtle: rgba(96, 165, 250, 0.12);
-  --color-accent-ink:    #0B1120;
-  --color-focus:         #60A5FA;
+  /* Accent — high-contrast Survey Teal */
+  --color-accent:        #2DD4BF;
+  --color-accent-hover:  #5EEAD4;
+  --color-accent-subtle: rgba(45, 212, 191, 0.14);
+  --color-accent-ink:    #091315;
+  --color-focus:         #2DD4BF;
 
-  --color-status-active:     #4ADE80;
-  --color-status-active-bg:  rgba(74, 222, 128, 0.10);
-  --color-status-pending:    #FBBF24;
-  --color-status-pending-bg: rgba(251, 191, 36, 0.10);
-  --color-status-urgent:     #F87171;
-  --color-status-urgent-bg:  rgba(248, 113, 113, 0.10);
-  --color-status-info:       #38BDF8;
-  --color-status-info-bg:    rgba(56, 189, 248, 0.10);
+  /* Semantic status — dark mode */
+  --color-status-active:      #4ADE80;
+  --color-status-active-bg:   rgba(74, 222, 128, 0.12);
+  --color-status-active-rule: rgba(74, 222, 128, 0.25);
+  --color-status-pending:     #FBBF24;
+  --color-status-pending-bg:  rgba(251, 191, 36, 0.14);
+  --color-status-pending-rule:rgba(251, 191, 36, 0.30);
+  --color-status-high:        #FB923C;
+  --color-status-high-bg:     rgba(251, 146, 60, 0.16);
+  --color-status-high-rule:   rgba(251, 146, 60, 0.34);
+  --color-status-urgent:      #FCA5A5;
+  --color-status-urgent-bg:   rgba(248, 113, 113, 0.16);
+  --color-status-urgent-rule: rgba(248, 113, 113, 0.34);
+  --color-status-info:        #38BDF8;
+  --color-status-info-bg:     rgba(56, 189, 248, 0.12);
+  --color-status-info-rule:   rgba(56, 189, 248, 0.25);
 
-  --shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --shadow-card:   0 2px 4px rgba(0, 0, 0, 0.45);
-  --shadow-modal:  0 12px 28px rgba(0, 0, 0, 0.65);
+  /* GIS Map Layer Accents — dark mode */
+  --color-layer-water:        #38BDF8;
+  --color-layer-lighting:     #FBBF24;
+  --color-layer-sanitation:   #34D399;
+  --color-layer-education:    #A78BFA;
+  --color-layer-health:       #F87171;
+
+  /* Elevation — dark mode */
+  --shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.40);
+  --shadow-card:   0 2px 6px rgba(0, 0, 0, 0.50);
+  --shadow-float:  0 6px 16px -2px rgba(0, 0, 0, 0.60);
+  --shadow-modal:  0 16px 36px -4px rgba(0, 0, 0, 0.75);
 }
