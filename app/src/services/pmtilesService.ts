@@ -188,8 +188,6 @@ export function zxyToTileId(z: number, x: number, y: number): number {
   }
 
   const n = 1 << z;
-  let rx = 0;
-  let ry = 0;
   let d = 0;
   let s = n / 2;
 
@@ -197,8 +195,8 @@ export function zxyToTileId(z: number, x: number, y: number): number {
   let ty = y;
 
   while (s > 0) {
-    rx = (tx & s) > 0 ? 1 : 0;
-    ry = (ty & s) > 0 ? 1 : 0;
+    const rx = (tx & s) > 0 ? 1 : 0;
+    const ry = (ty & s) > 0 ? 1 : 0;
     d += s * s * ((3 * rx) ^ ry);
     if (ry === 0) {
       if (rx === 1) {
@@ -309,6 +307,7 @@ export class TilePackageManager {
       req.onsuccess = () => {
         const results = (req.result || []).map((item) => {
           const { blob, ...meta } = item;
+          void blob;
           return meta as TilePackageMetadata;
         });
         resolve(results);
