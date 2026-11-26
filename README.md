@@ -1,236 +1,215 @@
-# CivicLens 🗺️🏛️
+# CivicLens
 
-**GIS-Based Village Resource & Infrastructure Monitoring System**
+**GIS-Based Rural Infrastructure & Citizen Grievance Intelligence Platform**
 
-CivicLens is a full-stack, mobile-first, and local-first GIS (Geographic Information System) platform built to transform scattered rural infrastructure data and resident grievances into an interactive, spatial map-based system. 
-
-In rural governance (such as Gram Panchayats in India), infrastructure logs typically live in paper registers and complaints are communicated by word of mouth. CivicLens bridges the gap between residents, field volunteers (ASHA/Anganwadi workers, survey teams), and local administration by turning handpumps, streetlights, roads, public toilets, and sanitation issues into geotagged, spatial records that can be audited, prioritized, and analyzed on a map.
+CivicLens is a mobile-first, local-first Geographic Information System (GIS) built for rural Gram Panchayats. It transforms scattered paper registers and word-of-mouth complaints into structured, geotagged spatial records—enabling residents, field volunteers (ASHA/Anganwadi workers, surveyors), and Panchayat officers to map infrastructure, report and corroborate grievances, and prioritize repairs on a live or offline map.
 
 ---
 
-## 🌟 Key Features
+## Motivation & Problem Context
 
-- **📱 Mobile-First & Local-First (Offline by Default)**: Designed for rural environments with patchy 2G/3G or zero connectivity. Built with [Dexie.js](https://dexie.com/) (IndexedDB) and Workbox Service Worker — all data can be read, created, and reviewed offline.
-- **🔄 Outbox Background Synchronization**: Edits and submissions are saved on-device with client-generated UUIDs and queued in an offline outbox. When connectivity is restored, records batch-sync idempotently with conflict-flagging and last-write-wins resolution.
-- **🗺️ Interactive Spatial Map & Layer Controls**: Built on [Leaflet.js](https://leafletjs.com/) with marker clustering and offline tile caching. Toggle distinct infrastructure layers: handpumps, overhead water tanks, schools, Anganwadis, primary health centres (PHCs), public toilets, streetlights, roads, and drainage.
-- **🚨 Citizen Grievance Reporting**: Residents can submit issues with single-tap GPS geotagging, category classification (Water, Sanitation, Lighting, Roads, Health, Education), severity ranking (Low, Medium, High, Critical), and photo attachments.
-- **⚡ Client-Side Photo Optimization**: A dedicated Web Worker (`photoWorker.ts`) compresses photos on the client device before queueing, conserving mobile bandwidth and free-tier cloud storage.
-- **📊 PostGIS Spatial Analytics Engine**:
-  - **Buffer Analysis / Coverage Gaps**: Automatically detect underserved areas, such as schools without a functioning drinking water source within 500 meters (`ST_DWithin`).
-  - **Spatial Hotspot Clustering**: Grid-based aggregation and K-means spatial clustering (`ST_ClusterKMeans`) to highlight grievance density hotspots for Gram Sabha budget planning.
-  - **Spatial Joins**: Automatically assign assets and issues to official Panchayat ward boundaries (`ST_Within`).
-- **🖨️ Gram Sabha Ward Report Generator**: Generate clean, printable ward-level summary reports featuring GIS snapshot layouts, asset health counts, and high-priority issue checklists for Gram Sabha meetings.
-- **🌐 Multilingual UI (i18n)**: Out-of-the-box support for **English** and **Hindi (हिंदी)** via `i18next`, complemented by intuitive civic iconography for low-literacy usability.
-- **📲 Progressive Web App (PWA) & Android APK**: Shareable via QR code / WhatsApp link as an installable PWA with zero installation friction, or compiled to a native Android APK using [Capacitor](https://capacitorjs.com/).
+Rural local governance faces structural constraints that standard cloud-first web apps cannot survive:
+
+- **The Rural Governance Gap**: Village infrastructure logs (handpumps, streetlights, public toilets, drains, Anganwadis, PHCs) often live in paper registers, while citizen complaints travel by word of mouth without location context, deduplication, or audit trails.
+- **Harsh Hardware & Connectivity**: Field staff and residents predominantly use **2GB RAM Android Go** smartphones in **patchy 2G/3G or complete cellular dead zones** (forest fringes, agricultural fields, riverbanks).
+- **Zero Recurring Budget ($0/month)**: Pilot Gram Panchayats cannot sustain paid SaaS or cloud bills. Every layer is engineered to run on permanent free tiers (Render, Supabase/Neon, Vercel/Netlify) with strict storage and memory guardrails.
+- **National Mission Alignment**: Designed at hyper-local, single-ward resolution to support **Swachh Bharat Mission** (sanitation & drainage) and **Jal Jeevan Mission** (drinking water coverage & handpump uptime).
 
 ---
 
-## 🏗️ System Architecture
+## Key Features
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│              CLIENT LAYER (React 19 + Vite PWA)              │
-│                                                             │
-│  - One responsive UI: Resident, Volunteer, Admin Dashboard │
-│  - Dexie.js (IndexedDB): Local storage of assets & outbox   │
-│  - Workbox Service Worker: Offline app shell & tile caching │
-│  - Leaflet + MarkerCluster: Spatial rendering & GPS mapping │
-│  - Web Worker: In-browser image compression                 │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ Background Batched Sync (/api/sync)
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 API LAYER (Node.js + Express 5)              │
-│                                                             │
-│  - Stateless REST endpoints: /api/assets, /api/issues       │
-│  - Spatial Analytics Engine: /api/analytics                 │
-│  - JWT & bcrypt authentication with role-based access       │
-│  - Compression & cache-control optimization                 │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ Spatial SQL Queries
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 DATA LAYER (PostgreSQL + PostGIS)            │
-│                                                             │
-│  - PostGIS Spatial Extension (geometry & geography types)   │
-│  - GiST spatial indexing for high-speed radius & KNN queries│
-│  - Tables: users, villages, wards, assets, issues, reports   │
-└─────────────────────────────────────────────────────────────┘
+- **Mobile-First & Local-First (Offline by Default)**: Built with [Dexie.js](https://dexie.org/) (IndexedDB v1/v2) and a Workbox Service Worker (`vite-plugin-pwa`). All assets, issues, and forms work at zero bars of signal.
+- **Outbox Background Synchronization**: Offline mutations use client-generated UUIDs (`crypto.randomUUID()`) and `client_seq_num` ordering, batch-syncing idempotently via `POST /api/sync` with conflict flagging and last-write-wins resolution.
+- **PMTiles v3 Offline Vector Maps**: `pmtilesService.ts` loads an entire district vector tile archive (~28MB) from IndexedDB using zero-copy `Blob.slice()` byte-range requests and Canvas 2D rendering, avoiding 50,000-file raster cache blowups and WebGL OOM crashes.
+- **Spatial Deduplication & Community Corroboration**:
+  - **Backend**: Partial functional GiST index on `location::geography` (`ST_DWithin` 30m radius + `ST_Azimuth` cardinal bearing) in PostGIS.
+  - **Client**: Offline 30m Haversine scan (`offlineDedup.ts`) with directional guidance and 1-tap community corroboration (`POST /api/issues/:id/corroborate`) to prevent duplicate tickets from GPS drift.
+- **Edge CV & Perceptual dHash**: `edgeVision.ts` and `visionService.ts` compute 64-bit difference hashes (`dHash`, Hamming distance $\le 6$) to flag duplicate/recycled photos, while `photoWorker.ts` downscales and compresses images (JPEG) off-thread to save 2G bandwidth and database space.
+- **Monsoon Vulnerability Analysis**: `waterloggingService.ts` and `GET /api/analytics/monsoon-vulnerability` score topographic depressions, drainage chokes, and soil runoff (VSI) for pre-monsoon desilting.
+- **CivicMesh P2P Sync**: `meshSyncService.ts` enables dead-zone, phone-to-phone outbox relaying via QR-signaled WebRTC DataChannels, Local SoftAP, and Data-Mule store-and-forward.
+- **TSP Route Optimization**: `routeOptimizationService.ts` computes priority-weighted maintenance dispatch routes offline using a 2-Opt local search heuristic (with Haversine tortuosity) and pgRouting online.
+- **PostGIS Spatial Analytics & Gram Sabha Reports**: Coverage gap detection (`ST_DWithin` 500m), spatial grid hotspots, and printable ward-level PDF/print summaries (`ReportPrintView.tsx`).
+- **AES-GCM-256 PII Encryption**: Resident phone numbers are encrypted on-device via Web Crypto (`db/index.ts`), and unauthenticated `GET /api/issues` requests strip PII server-side.
+- **Multilingual UI & Android APK**: Trilingual **English**, **Hindi (हिंदी)**, and **Marathi (मराठी)** via `i18next`, installable as a PWA or compiled to a native Android APK via **Capacitor 8**.
+
+---
+
+## System Architecture
+
+```mermaid
+flowchart TB
+    subgraph Client["Client Layer (React 19 + Vite PWA / Capacitor 8 Android)"]
+        UI["Responsive Mobile-First UI (Map, Report, QuickAdd, Admin, Print)"]
+        Dexie["Dexie.js IndexedDB (assets, issues, outbox, AES-GCM-256 PII)"]
+        OfflineEngines["Offline Engines: PMTiles v3, Edge CV / dHash, 30m Dedup, TSP 2-Opt"]
+        Mesh["CivicMesh P2P Sync (QR-WebRTC / SoftAP / Data-Mule)"]
+        UI <--> Dexie
+        UI <--> OfflineEngines
+        Dexie <--> Mesh
+    end
+
+    subgraph API["API Layer (Node.js + Express 5 + TypeScript)"]
+        Middleware["Security & Perf: Helmet, CORS, Compression, Rate Limit, JWT RBAC"]
+        Routes["REST Routes: /auth, /assets, /issues, /cv, /analytics, /sync"]
+        Services["Services: spatialDedupService, visionService, waterloggingService"]
+        Middleware --> Routes --> Services
+    end
+
+    subgraph Data["Data Layer (PostgreSQL 16 + PostGIS 3.4)"]
+        Tables["Tables: users, villages, wards, assets, issues, issue_corroborations, reports"]
+        Spatial["Partial Functional GiST Indexes & Stored Functions (fn_find_duplicate_issues)"]
+        Tables --- Spatial
+    end
+
+    Dexie <-->|"Batched Outbox Sync (/api/sync) & GeoJSON REST"| Middleware
+    Services <-->|"Spatial SQL Queries"| Tables
 ```
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
-```
+```text
 CivicLens/
-├── api/                             # Node.js + Express + TypeScript Backend
+├── api/                                # Node.js + Express 5 + TypeScript Backend
 │   ├── src/
 │   │   ├── config/
-│   │   │   └── db.ts                # PostgreSQL / PostGIS connection pool
+│   │   │   ├── db.ts                   # PostgreSQL / PostGIS connection pool
+│   │   │   └── secrets.ts              # JWT_SECRET & ALLOWED_ORIGINS config
 │   │   ├── controllers/
-│   │   │   ├── analyticsController.ts # PostGIS coverage gaps & grid hotspots
-│   │   │   ├── assetController.ts     # GeoJSON asset CRUD
-│   │   │   ├── authController.ts      # Authentication (JWT + bcrypt)
-│   │   │   ├── issueController.ts     # Grievance ingestion & status updates
-│   │   │   └── syncController.ts      # Offline outbox batch synchronization
+│   │   │   ├── analyticsController.ts  # Summary, coverage gaps & grid hotspots
+│   │   │   ├── assetController.ts      # GeoJSON asset CRUD
+│   │   │   ├── authController.ts       # JWT + bcryptjs login & registration
+│   │   │   ├── issueController.ts      # Grievance ingestion, PII stripping & status
+│   │   │   ├── spatialController.ts    # Dedup, corroborate, CV classify & monsoon VSI
+│   │   │   └── syncController.ts       # Idempotent offline outbox batch sync
 │   │   ├── db/
-│   │   │   ├── schema.sql           # PostGIS DDL schema and GiST indexes
-│   │   │   ├── seed.sql             # Pilot ward mock spatial data
-│   │   │   └── migration.sql        # Database migration scripts
+│   │   │   ├── schema.sql              # Core PostGIS DDL schema & GiST indexes
+│   │   │   ├── spatial_schema.sql      # Pillar 2 tables, partial GiST & functions
+│   │   │   ├── migration.sql           # Incremental schema migrations
+│   │   │   └── seed.sql                # Pilot ward spatial seed data
 │   │   ├── middleware/
-│   │   │   └── auth.ts              # JWT verification and RBAC guards
-│   │   └── server.ts                # Express server entry point & routing
+│   │   │   └── auth.ts                 # authenticateToken, optionalAuthenticateToken, requireRole
+│   │   ├── services/
+│   │   │   ├── spatialDedupService.ts  # 30m PostGIS dedup & corroboration logic
+│   │   │   ├── visionService.ts        # Server-side dHash & CV classification
+│   │   │   └── waterloggingService.ts  # Monsoon VSI scoring & drainage analysis
+│   │   ├── __tests__/                  # Vitest + Supertest API test suites (3 suites)
+│   │   └── server.ts                   # Express 5 entry point & middleware stack
+│   ├── Dockerfile
 │   ├── package.json
 │   └── tsconfig.json
 │
-├── app/                             # React 19 + TypeScript + Vite PWA & Android
-│   ├── android/                     # Capacitor Native Android Studio project
+├── app/                                # React 19 + TypeScript + Vite PWA & Capacitor Android
+│   ├── android/                        # Capacitor 8 native Android project
 │   ├── src/
-│   │   ├── assets/                  # Icons and graphics
-│   │   ├── components/              # UI components (Header, BottomNav, BottomSheet, Modal, Icons)
-│   │   ├── data/
-│   │   │   └── seed_pilot_ward.json # Embedded pilot ward offline seed records
-│   │   ├── db/
-│   │   │   └── index.ts             # Dexie.js IndexedDB schema & encryption
-│   │   ├── hooks/
-│   │   │   ├── useGeolocation.ts    # GPS fix capture with error handling
-│   │   │   └── useOfflineSync.ts    # Outbox polling and sync orchestrator
-│   │   ├── i18n/
-│   │   │   └── index.ts             # English & Hindi translations
-│   │   ├── services/
-│   │   │   ├── apiService.ts        # API client with JWT handling
-│   │   │   └── photoWorker.ts       # Off-thread image compression
-│   │   ├── utils/
-│   │   │   └── seedLoader.ts        # Offline DB seeder
-│   │   ├── views/
-│   │   │   ├── AdminDashboard.tsx   # Ward KPIs, resolution rates, charts
-│   │   │   ├── AuthScreen.tsx       # Login & Registration screen
-│   │   │   ├── MapView.tsx          # Interactive Leaflet map with filters
-│   │   │   ├── MyReportsView.tsx    # Resident issue status tracking
-│   │   │   ├── ReportIssueForm.tsx  # Citizen grievance submission form
-│   │   │   ├── ReportPrintView.tsx  # Printable Gram Sabha ward report
-│   │   │   └── VolunteerQuickAdd.tsx# Fast field-survey asset addition
-│   │   ├── App.tsx                  # Tab navigation and routing shell
-│   │   └── main.tsx                 # React DOM mount point
-│   ├── capacitor.config.ts          # Capacitor Android configuration
-│   ├── vite.config.ts               # Vite configuration with vite-plugin-pwa
+│   │   ├── components/                 # Header, BottomNav, BottomSheet, CameraReviewModal, CivicIcons, ErrorBoundary, PermissionPromptCard, StoragePersistModal
+│   │   ├── data/seed_pilot_ward.json   # Embedded pilot ward offline seed records
+│   │   ├── db/index.ts                 # Dexie.js v1/v2 schema & AES-GCM-256 PII crypto
+│   │   ├── hooks/                      # useGeolocation, useOfflineSync, useCompassHeading
+│   │   ├── i18n/index.ts               # English, Hindi & Marathi translations
+│   │   ├── services/                   # apiService, cameraService, edgeVision, meshSyncService, offlineDedup, photoWorker, pmtilesService, routeOptimizationService
+│   │   ├── utils/seedLoader.ts         # Offline IndexedDB seeder
+│   │   ├── views/                      # MapView, ReportIssueForm, MyReportsView, VolunteerQuickAdd, AdminDashboard, ReportPrintView, AuthScreen
+│   │   ├── App.tsx                     # Code-split tab shell & pin-pick routing
+│   │   └── main.tsx                    # React DOM entry point
+│   ├── capacitor.config.ts             # Capacitor 8 config (org.civiclens.app)
+│   ├── vite.config.ts                  # Vite + vite-plugin-pwa (Workbox) config
 │   └── package.json
 │
-├── .github/workflows/
-│   └── keep-alive.yml               # Automated cron pinger for free-tier hosting
-├── build-apk.bat                    # One-click Windows batch script to build Android APK
-├── run-dev.bat                      # One-click script to launch Vite dev server
-├── CivicLens_Project_Plan.md        # Comprehensive 14-week specification & EPICS plan
-└── README.md
+├── docs/                               # Technical & Architecture Documentation
+│   ├── README.md                       # Central documentation hub
+│   ├── motivation-and-domain.md        # Problem statement, roles, constraints & goals
+│   ├── architecture/                   # System overview, Pillar 4 & Unified Synthesis
+│   ├── api/                            # Backend API reference
+│   ├── database/                       # PostGIS schema & spatial queries
+│   ├── frontend/                       # PWA, UI views, components & design tokens
+│   ├── offline-and-mesh.md             # Dexie, PMTiles v3, CivicMesh, TSP & Edge CV
+│   ├── deployment-and-android.md       # Docker, free-tier cloud & Android APK guide
+│   ├── testing.md                      # Vitest test suites & verification guide
+│   └── pillar2-advanced-gis-spatial-intelligence.md
+│
+├── .github/workflows/                  # CI & free-tier keep-alive cron workflows
+├── docker-compose.yml                  # Local PostGIS 16-3.4 + API stack
+├── build-apk.bat                       # Windows one-click Capacitor Android APK build
+├── run-dev.bat                         # Windows one-click Vite dev launcher
+├── CivicLens_Project_Plan.md           # 14-week EPICS specification
+├── DESIGN.md                           # Survey Atlas & Civic Governance design tokens
+├── .env.example                        # Environment variable template
+└── LICENSE                             # MIT License
 ```
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
-| Domain | Technology | Purpose |
+| Layer | Technology | Purpose |
 |---|---|---|
-| **Frontend Framework** | [React 19](https://react.dev/) + [Vite](https://vitejs.dev/) | High-performance, reactive mobile-first PWA |
-| **Language** | [TypeScript](https://www.typescriptlang.org/) | End-to-end type safety |
-| **Offline Storage** | [Dexie.js](https://dexie.com/) (IndexedDB) | On-device persistent database for offline resilience |
-| **Map Engine** | [Leaflet](https://leafletjs.com/) + [Leaflet.markercluster](https://github.com/Leaflet/Leaflet.markercluster) | Lightweight spatial map visualization and clustering |
-| **PWA Engine** | [Vite Plugin PWA](https://vite-pwa-org.netlify.app/) (Workbox) | Offline app shell caching & service worker routing |
-| **Localization** | [i18next](https://www.i18next.com/) & `react-i18next` | English and Hindi bilingual UI support |
-| **Mobile Runtime** | [Capacitor 8](https://capacitorjs.com/) | Android APK generation from the same web codebase |
-| **Backend API** | [Node.js](https://nodejs.org/) & [Express 5](https://expressjs.com/) | Thin REST API with gzip compression |
-| **Database** | [PostgreSQL](https://www.postgresql.org/) + [PostGIS](https://postgis.net/) | Spatial indexing (GiST), buffer analysis, clustering |
-| **Authentication** | [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken) + [bcryptjs](https://github.com/dcodeIO/bcrypt.js) | JWT-based auth with offline fallback demo profile |
+| **Frontend** | React 19, Vite 8, TypeScript | Mobile-first, code-split PWA shell |
+| **Offline Storage** | Dexie.js 4 (IndexedDB) + Web Crypto | Local-first store, outbox queue, AES-GCM-256 PII encryption |
+| **PWA & Caching** | `vite-plugin-pwa` (Workbox) | Offline app shell & runtime caching |
+| **Mapping** | Leaflet 1.9, `leaflet.markercluster`, PMTiles v3 | Interactive spatial layers & offline district vector tiles |
+| **Localization** | `i18next`, `react-i18next` | English, Hindi (हिंदी), and Marathi (मराठी) UI |
+| **Mobile Native** | Capacitor 8 (`@capacitor/android`, Camera, Geolocation) | Native Android APK from the same codebase |
+| **Backend API** | Node.js, Express 5, Zod 4 | Thin REST API with Helmet, CORS, gzip compression, rate limiting |
+| **Database** | PostgreSQL 16 + PostGIS 3.4 | Spatial indexing (partial GiST), `ST_DWithin`, `ST_Azimuth`, VSI |
+| **Auth** | `jsonwebtoken`, `bcryptjs` | Stateless JWT auth & RBAC (`viewer`, `surveyor`, `panchayat_officer`, `admin`) |
+| **Testing** | Vitest 5, Supertest, `happy-dom` | Unit & integration tests across API and PWA |
 
 ---
 
-## 🚀 Getting Started
+## Quick Start
 
-### Prerequisites
+### Option A: Docker Compose (Recommended for Backend + PostGIS)
 
-- **Node.js** (v18.x or higher) & **npm**
-- **PostgreSQL** (v14+) with **PostGIS** extension installed (or a hosted instance such as [Supabase](https://supabase.com/) or [Neon](https://neon.tech/))
-- *(Optional for Android builds)* **Android Studio** & **Android SDK** with `ANDROID_HOME` configured
-
----
-
-### 1. Database Setup
-
-Create a PostgreSQL database and initialize the PostGIS schema and seed data:
-
-```bash
-# Connect to your PostgreSQL instance
-psql -U postgres -d postgres
-
-# Create database
-CREATE DATABASE civiclens;
-\c civiclens
-
-# Execute schema and initial seeds
-\i api/src/db/schema.sql
-\i api/src/db/seed.sql
-```
-
----
-
-### 2. Backend API Setup
-
-1. Navigate to the `api` directory:
+1. Copy `.env.example` to `.env` if customizing secrets (or use the defaults in `docker-compose.yml` for local testing).
+2. Start PostGIS and the Express API:
    ```bash
-   cd api
-   npm install
+   docker compose up --build
    ```
-
-2. Create a `.env` file in the project root or configure your connection string:
-   ```env
-   PORT=4000
-   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/civiclens
-   JWT_SECRET=your_jwt_secret_key_here
-   ```
-
-3. Start the API server:
-   ```bash
-   # Development mode with hot reload
-   npm start
-
-   # Production build
-   npm run build
-   node dist/server.js
-   ```
-
-The API will listen at `http://localhost:4000`. Health check is available at `GET /api/health`.
-
----
-
-### 3. Frontend App Setup
-
-1. In a new terminal, navigate to the `app` directory:
+   This initializes `postgis/postgis:16-3.4` with `api/src/db/schema.sql` and `api/src/db/seed.sql`, and starts the API on `http://localhost:4000` (`GET /api/health`).
+3. In a separate terminal, start the frontend PWA:
    ```bash
    cd app
    npm install
-   ```
-
-2. Start the development server:
-   ```bash
    npm run dev
    ```
-   *(On Windows, you can also double-click [run-dev.bat](file:///d:/projects/CivicLens/run-dev.bat))*
+   Open `http://localhost:5173`.
 
-3. Open `http://localhost:5173` in your browser.
-   - For mobile testing, open Chrome DevTools and switch to Mobile Device Emulation.
-   - Test offline mode by going to Network tab and selecting **Offline**.
+### Option B: Manual Local Setup
+
+1. **Database**: Create a PostgreSQL + PostGIS database named `civiclens` and run:
+   ```sql
+   \i api/src/db/schema.sql
+   \i api/src/db/spatial_schema.sql
+   \i api/src/db/seed.sql
+   ```
+2. **Backend API**:
+   ```bash
+   cp .env.example .env   # Configure DATABASE_URL and JWT_SECRET
+   cd api
+   npm install
+   npm start              # Runs ts-node-dev src/server.ts on port 4000
+   ```
+3. **Frontend App**:
+   ```bash
+   cd app
+   npm install
+   npm run dev            # Or double-click run-dev.bat on Windows
+   ```
 
 ---
 
-### 4. Building the Android APK
+## Building the Android APK
 
-If you have Android Studio and the Android SDK installed:
+Requires Android Studio / Android SDK (`ANDROID_HOME` configured):
 
 ```bash
-# Option A: Run the one-click build script (Windows)
+# Option A: Windows one-click script
 build-apk.bat
 
-# Option B: Manual build steps
+# Option B: Manual Capacitor build
 cd app
 npm run build
 npx cap sync android
@@ -238,38 +217,54 @@ cd android
 ./gradlew assembleDebug
 ```
 
-The compiled APK will be located at:
-`app/android/app/build/outputs/apk/debug/app-debug.apk`
+Output APK: `app/android/app/build/outputs/apk/debug/app-debug.apk`.
 
 ---
 
-## 🔌 API Reference
+## Testing
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `GET` | `/api/health` | None | Service heartbeat and uptime check |
-| `POST` | `/api/auth/register` | None | Register a resident or volunteer surveyor |
-| `POST` | `/api/auth/login` | None | Authenticate user and receive JWT token |
-| `GET` | `/api/assets` | None | Retrieve infrastructure assets as a GeoJSON FeatureCollection |
-| `POST` | `/api/assets` | JWT | Create a new geotagged asset |
-| `GET` | `/api/issues` | None | Retrieve reported issues as a GeoJSON FeatureCollection |
-| `POST` | `/api/issues` | JWT | Submit a new grievance with photo and location |
-| `PATCH`| `/api/issues/:id/status`| Admin/Officer | Update issue lifecycle status (`open` → `in_progress` → `resolved`) |
-| `GET` | `/api/analytics/summary` | None | Overall asset/issue counts, resolution status breakdown |
-| `GET` | `/api/analytics/coverage-gaps` | None | PostGIS buffer analysis (e.g., schools without handpumps in 500m) |
-| `GET` | `/api/analytics/hotspots` | None | Spatial grid aggregation of issue density |
-| `POST` | `/api/sync` | JWT | Batch sync client outbox mutations with conflict resolution |
+CivicLens uses **Vitest** across both packages:
+
+```bash
+# Backend API tests (3 suites: auth/validation, media/GPS sync, spatial intelligence)
+cd api && npm test
+
+# Frontend PWA tests (9 suites: PII encryption, geolocation, API, CV, mesh, PMTiles, TSP, Pillar 2, MapView)
+cd app && npm test
+```
 
 ---
 
-## 🔒 Security & Privacy
+## Documentation Index
 
-- **Citizen Privacy**: Resident personal identifiers (phone numbers, full names) can be locally encrypted or anonymized on-device; PII is strictly restricted to administrative roles.
-- **Role-Based Access Control (RBAC)**: Users are categorized as `viewer`, `surveyor`, `panchayat_officer`, or `admin`. Issue status modifications and administrative exports require authorized tokens.
-- **Offline Integrity**: On-device mutations use cryptographically strong UUIDs (`crypto.randomUUID()`) to prevent ID collisions when multiple surveyors collect data concurrently without connectivity.
+Start at the **[Documentation Hub](docs/README.md)** for persona-based navigation, or jump directly to:
+
+| Document | Description |
+|---|---|
+| [Motivation & Domain](docs/motivation-and-domain.md) | Rural governance problem statement, workflows, user roles, constraints & goals |
+| [System Overview](docs/architecture/system-overview.md) | Client-API-PostGIS architecture, offline outbox sync & security/RBAC diagrams |
+| [Backend API Reference](docs/api/backend-api-reference.md) | Express 5 middleware, REST endpoints, Zod schemas & service layer |
+| [PostGIS Schema & Queries](docs/database/postgis-schema-and-queries.md) | ER diagram, tables, partial GiST indexes, triggers & stored functions |
+| [PWA & UI Architecture](docs/frontend/pwa-and-ui.md) | React 19 views, components, hooks, i18n & [DESIGN.md](DESIGN.md) tokens |
+| [Offline & Mesh Engines](docs/offline-and-mesh.md) | Dexie.js, AES-GCM-256 PII, PMTiles v3, CivicMesh P2P, TSP & Edge CV |
+| [Deployment & Android](docs/deployment-and-android.md) | Docker Compose, `.env` config, $0 cloud hosting & Capacitor 8 APK |
+| [Testing Guide](docs/testing.md) | Vitest suites, `happy-dom` & Supertest coverage |
+| [Pillar 2: Spatial Intelligence](docs/pillar2-advanced-gis-spatial-intelligence.md) | Spatial deduplication, Edge CV dHash & monsoon VSI specification |
+| [Pillar 4: Offline & Mesh](docs/architecture/pillar4-offline-mesh-resiliency.md) | PMTiles v3, CivicMesh v1 & TSP dispatch specification |
+| [Unified Synthesis](docs/architecture/unified-spatial-offline-mesh-synthesis.md) | Cross-pillar stress-test scorecard & architectural mitigations |
+| [Project Plan](CivicLens_Project_Plan.md) | 14-week EPICS specification & scope |
 
 ---
 
-## 📄 License
+## Security & Privacy
 
-This project is licensed under the MIT License — see the [LICENSE](file:///d:/projects/CivicLens/LICENSE) file for details.
+- **On-Device PII Encryption**: Resident phone numbers are encrypted locally using **AES-GCM-256** via the Web Crypto API (`app/src/db/index.ts`) keyed from a persistent device seed (`civiclens_device_key_seed`).
+- **Server-Side PII Stripping**: `GET /api/issues` uses `optionalAuthenticateToken` to strip sensitive reporter fields from unauthenticated responses.
+- **Role-Based Access Control (RBAC)**: Four roles (`viewer`, `surveyor`, `panchayat_officer`, `admin`) enforced via `authenticateToken` and `requireRole(...)`. Issue status transitions require `admin` or `panchayat_officer`.
+- **API Hardening**: `helmet`, restricted `cors` (`ALLOWED_ORIGINS`), `express-rate-limit` (30 req/15m on auth routes, 300 req/15m on `/api/`), and `10mb` JSON body cap.
+
+---
+
+## License
+
+This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for details.

@@ -60,6 +60,12 @@ CREATE TABLE IF NOT EXISTS issues (
   severity TEXT CHECK (severity IN ('low','medium','high','critical')) DEFAULT 'medium',
   description TEXT,
   photo_url TEXT,
+  photos JSONB DEFAULT '[]',
+  gps_accuracy_m REAL,
+  heading_deg REAL,
+  location_source TEXT DEFAULT 'gps',
+  resolution_photo_url TEXT,
+  resolution_photo_meta JSONB,
   encrypted_phone TEXT,
   location GEOMETRY(POINT, 4326) NOT NULL,
   status TEXT DEFAULT 'open' CHECK (status IN ('open','in_progress','resolved')),
@@ -102,3 +108,25 @@ CREATE TABLE IF NOT EXISTS sync_conflicts (
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending','resolved')),
   created_at TIMESTAMP DEFAULT now()
 );
+
+
+-- Auto-update updated_at timestamp trigger
+CREATE OR REPLACE FUNCTION set_updated_at_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_assets_updated_at ON assets;
+CREATE TRIGGER trg_assets_updated_at
+BEFORE UPDATE ON assets
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at_timestamp();
+
+DROP TRIGGER IF EXISTS trg_issues_updated_at ON issues;
+CREATE TRIGGER trg_issues_updated_at
+BEFORE UPDATE ON issues
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at_timestamp();

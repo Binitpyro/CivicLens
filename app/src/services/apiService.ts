@@ -5,12 +5,13 @@ export interface UserProfile {
   role: 'citizen' | 'volunteer' | 'admin';
   ward_id?: number;
 }
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
-async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
+export const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4000/api';
+
+export async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
   const token = localStorage.getItem('civiclens_token');
   const headers = new Headers(options.headers);
-  
+
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
@@ -28,13 +29,18 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
       signal: controller.signal,
     });
 
+    if (response.status === 401 && token) {
+      // Token expired or invalid
+      console.warn('Authentication token expired or rejected by server.');
+    }
+
     if (!response.ok) {
       let errorMessage = 'API Request Failed';
       try {
         const errorData = await response.json();
         errorMessage = errorData.error || errorMessage;
-      } catch (e) {
-        // ignore
+      } catch {
+        // ignore JSON parse failure on non-JSON error pages
       }
       throw new Error(errorMessage);
     }
@@ -45,16 +51,21 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
   }
 }
 
-export async function loginUser(phone: string, password: string): Promise<{token: string, user: UserProfile}> {
+export async function loginUser(phone: string, password: string): Promise<{ token: string; user: UserProfile }> {
   return fetchWithAuth('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ phone, password })
+    body: JSON.stringify({ phone, password }),
   });
 }
 
-export async function registerUser(name: string, phone: string, password: string, ward_id?: number): Promise<{token: string, user: UserProfile}> {
+export async function registerUser(
+  name: string,
+  phone: string,
+  password: string,
+  ward_id?: number
+): Promise<{ token: string; user: UserProfile }> {
   return fetchWithAuth('/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ name, phone, password, ward_id })
+    body: JSON.stringify({ name, phone, password, ward_id }),
   });
 }

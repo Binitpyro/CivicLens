@@ -1,19 +1,33 @@
 import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { z } from 'zod';
 import { pool } from '../config/db';
+import { JWT_SECRET } from '../config/secrets';
 
-if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
-  console.warn('CRITICAL SECURITY WARNING: JWT_SECRET environment variable is missing in production!');
-}
-const JWT_SECRET = process.env.JWT_SECRET || 'civiclens-super-secret-key-2026';
+const loginSchema = z.object({
+  phone: z.string().trim().min(5, 'Phone must be at least 5 digits').max(20),
+  password: z.string().min(4, 'Password must be at least 4 characters').max(100),
+});
+
+const registerSchema = z.object({
+  name: z.string().trim().min(2, 'Name must be at least 2 characters').max(100),
+  phone: z.string().trim().min(5, 'Phone must be at least 5 digits').max(20),
+  password: z.string().min(4, 'Password must be at least 4 characters').max(100),
+  ward_id: z.coerce.number().int().positive().optional(),
+});
 
 export async function login(req: Request, res: Response) {
   try {
-    const { phone, password } = req.body;
-    if (!phone || !password) {
-      return res.status(400).json({ error: 'Phone and password are required' });
+    const parseResult = loginSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: parseResult.error.flatten().fieldErrors,
+      });
     }
+
+    const { phone, password } = parseResult.data;
 
     const result = await pool.query('SELECT * FROM users WHERE phone = $1', [phone]);
     if (result.rows.length === 0) {
@@ -29,7 +43,7 @@ export async function login(req: Request, res: Response) {
     const token = jwt.sign(
       { id: user.id, phone: user.phone, role: user.role, ward_id: user.ward_id },
       JWT_SECRET,
-      { expiresIn: '30d' } // Long-lived token for offline field resilience
+      { expiresIn: '30d' }
     );
 
     return res.json({
@@ -39,8 +53,8 @@ export async function login(req: Request, res: Response) {
         name: user.name,
         phone: user.phone,
         role: user.role,
-        ward_id: user.ward_id
-      }
+        ward_id: user.ward_id,
+      },
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -50,10 +64,15 @@ export async function login(req: Request, res: Response) {
 
 export async function register(req: Request, res: Response) {
   try {
-    const { name, phone, password, ward_id } = req.body;
-    if (!name || !phone || !password) {
-      return res.status(400).json({ error: 'Name, phone, and password are required' });
+    const parseResult = registerSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: parseResult.error.flatten().fieldErrors,
+      });
     }
+
+    const { name, phone, password, ward_id } = parseResult.data;
 
     // Security: Public self-registration always defaults strictly to 'viewer'
     // Prevents privilege escalation where attackers pass role: 'admin'

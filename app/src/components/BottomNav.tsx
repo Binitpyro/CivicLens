@@ -1,11 +1,11 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { 
-  IconMap, 
-  IconPlus, 
-  IconClipboard, 
-  IconRapid, 
-  IconBarChart 
+import {
+  IconMap,
+  IconPlus,
+  IconClipboard,
+  IconRapid,
+  IconBarChart,
 } from './CivicIcons';
 
 export type TabType = 'map' | 'report' | 'myReports' | 'quickAdd' | 'admin';
@@ -37,7 +37,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab })
         type="button"
         className={`nav-tab-btn ${activeTab === 'report' ? 'active' : ''}`}
         onClick={() => setActiveTab('report')}
-        aria-label={t('nav.report')}
+        aria-label={t('actions.reportIssue')}
         aria-current={activeTab === 'report' ? 'page' : undefined}
       >
         <span className="tab-icon" aria-hidden="true">
@@ -50,7 +50,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab })
         type="button"
         className={`nav-tab-btn ${activeTab === 'myReports' ? 'active' : ''}`}
         onClick={() => setActiveTab('myReports')}
-        aria-label={t('nav.myReports')}
+        aria-label={t('nav.myReportsFull')}
         aria-current={activeTab === 'myReports' ? 'page' : undefined}
       >
         <span className="tab-icon" aria-hidden="true">
@@ -63,7 +63,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab })
         type="button"
         className={`nav-tab-btn ${activeTab === 'quickAdd' ? 'active' : ''}`}
         onClick={() => setActiveTab('quickAdd')}
-        aria-label={t('nav.quickAdd')}
+        aria-label={t('actions.addAsset')}
         aria-current={activeTab === 'quickAdd' ? 'page' : undefined}
       >
         <span className="tab-icon" aria-hidden="true">

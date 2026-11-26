@@ -1,10 +1,20 @@
 import type { Request, Response } from 'express';
+import { z } from 'zod';
 import { pool } from '../config/db';
+
+const wardQuerySchema = z.object({
+  ward_id: z.coerce.number().int().positive().default(1),
+});
+
+const coverageGapsQuerySchema = z.object({
+  ward_id: z.coerce.number().int().positive().default(1),
+  distance_m: z.coerce.number().int().positive().max(5000).default(500),
+});
 
 export async function getSummary(req: Request, res: Response) {
   try {
-    const { ward_id } = req.query;
-    const wardId = ward_id || 1;
+    const parseResult = wardQuerySchema.safeParse(req.query);
+    const wardId = parseResult.success ? parseResult.data.ward_id : 1;
 
     // Parallel execution of summary aggregation queries
     const [assetCounts, categoryCounts, statusCounts, severityCounts] = await Promise.all([
@@ -53,9 +63,15 @@ export async function getSummary(req: Request, res: Response) {
 
 export async function getCoverageGaps(req: Request, res: Response) {
   try {
-    const { distance_m, ward_id } = req.query;
-    const radiusMeters = parseInt(distance_m as string) || 500;
-    const wardId = ward_id || 1;
+    const parseResult = coverageGapsQuerySchema.safeParse(req.query);
+    if (!parseResult.success) {
+      return res.status(400).json({
+        error: 'Invalid query parameters',
+        details: parseResult.error.flatten().fieldErrors,
+      });
+    }
+
+    const { ward_id: wardId, distance_m: radiusMeters } = parseResult.data;
 
     // PostGIS ST_DWithin Buffer Analysis: Schools with no working handpump within N meters
     const query = `
@@ -85,7 +101,7 @@ export async function getCoverageGaps(req: Request, res: Response) {
         id: row.id,
         name: row.name,
         type: row.asset_type,
-        gap_type: 'No active handpump within ' + radiusMeters + 'm',
+        gap_type: `No active handpump within ${radiusMeters}m`,
       },
     }));
 
@@ -101,15 +117,30 @@ export async function getCoverageGaps(req: Request, res: Response) {
 
 export async function getSpatialGridHotspots(req: Request, res: Response) {
   try {
-    const { ward_id } = req.query;
-    const wardId = ward_id || 1;
+    const parseResult = wardQuerySchema.safeParse(req.query);
+    const wardId = parseResult.success ? parseResult.data.ward_id : 1;
 
     // Use ST_SnapToGrid for lightweight spatial aggregation instead of heavy ST_ClusterKMeans
+    // Fix peak_severity ordering so 'critical' > 'high' > 'medium' > 'low'
     const query = `
       SELECT 
         ST_AsGeoJSON(ST_Centroid(ST_Collect(location)))::json AS geometry,
         COUNT(*) AS issue_count,
-        MAX(severity) AS peak_severity
+        CASE MAX(
+          CASE severity
+            WHEN 'critical' THEN 4
+            WHEN 'high' THEN 3
+            WHEN 'medium' THEN 2
+            WHEN 'low' THEN 1
+            ELSE 0
+          END
+        )
+          WHEN 4 THEN 'critical'
+          WHEN 3 THEN 'high'
+          WHEN 2 THEN 'medium'
+          WHEN 1 THEN 'low'
+          ELSE 'low'
+        END AS peak_severity
       FROM issues
       WHERE ward_id = $1 AND status != 'resolved'
       GROUP BY ST_SnapToGrid(location, 0.005)
